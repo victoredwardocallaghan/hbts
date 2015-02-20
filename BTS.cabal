@@ -22,7 +22,7 @@ library
   exposed-modules:     BTS.Version,
                        BTS.GSMCommon
   other-modules:       GitRev,
-                       Paths_hbts
+                       Paths_BTS
   build-depends:       base, ansi-terminal, pretty
 --  build-depends:       base ==4.6.*, mtl ==2.2.*, transformers ==0.4.*, hslogger ==1.2.*, hlibBladeRF ==0.1.*, network ==2.6.*, time ==1.4.*, ansi-wl-pprint ==0.6.*, lens ==4.7.*, template-haskell ==2.8.*, containers ==0.5.*
   hs-source-dirs:      src
