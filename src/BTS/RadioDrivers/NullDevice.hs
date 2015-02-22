@@ -65,7 +65,6 @@ mods :: Selector a -> (a -> a) -> NullDevice ()
 mods (gf,uf) mfun = do st <- gf
                        uf (mfun st)
 
-
 updateTime :: NullDevice ()
 updateTime  = do
   sr <- NullDevice $ gets sampleRate
@@ -73,6 +72,7 @@ updateTime  = do
   ct <- liftIO getCurrentTime
   mods s4 (const $ floor (sr * realToFrac (diffUTCTime ct st)))
 
+-- | Internal initial state-object constructor
 runNullDevice :: Double -> NullDevice a -> IO a
 runNullDevice sr m = getCurrentTime >>= \curTime -> evalStateT (unNullDevice m) (HwState sr 0 0 0 curTime False)
 
@@ -82,15 +82,17 @@ bracket start stop body = do
      stop
 
 -- | Object constructor
---  LOG(INFO) << "creating SDR device...";
 withNullDevice :: Double -> NullDevice a -> IO ()
-withNullDevice sr stuff = runNullDevice sr (bracket nullDeviceStart nullDeviceStop stuff)
+withNullDevice sr stuff = do
+  liftIO $ putStrLn "INFO creating SDR device..."
+  runNullDevice sr $ bracket nullDeviceStart nullDeviceStop stuff
 
 
 -- | Construct an instance of the RadioDevice interface type with NullDevice
 constructNullDevice :: IO (RadioDevice NullDevice)
 constructNullDevice = do
-  let nulldev = RadioDevice { setVCTCXO             = undefined
+  let nulldev = RadioDevice { withRadioDevice       = withNullDevice
+                            , setVCTCXO             = undefined
                             , setTxFreq             = nullDeviceSetTxFreq
                             , setRxFreq             = nullDeviceSetRxFreq
                             -- **

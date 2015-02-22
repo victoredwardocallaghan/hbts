@@ -15,7 +15,8 @@ import BTS.GSMCommon
 
 type TimeStamp = Integer -- ^ 64-bit virtual timestamp for radio data
 
-data RadioDevice m = RadioDevice { setVCTCXO             :: Int -> m ()              -- ^ Set the VCTCXO input voltage
+data RadioDevice m = RadioDevice { withRadioDevice       :: Double -> m () -> IO ()  -- ^ bracket pattern wrapper
+                                 , setVCTCXO             :: Int -> m ()              -- ^ Set the VCTCXO input voltage
                                  , setTxFreq             :: Double -> Double -> m () -- ^ Set the transmitter frequency
                                  , setRxFreq             :: Double -> Double -> m () -- ^ Set the receiver frequency
                                  --
