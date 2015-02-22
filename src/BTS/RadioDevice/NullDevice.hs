@@ -46,7 +46,6 @@ instance Applicative NullDevice where
 --  short *dummyBurst;
 --  int dummyBurstSz;
 --  int dummyBurstCursor;
---  bool underrun;
 
 
 -- Type'ed state transistion structure

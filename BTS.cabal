@@ -21,30 +21,20 @@ extra-source-files:  configure
 library
   exposed-modules:     BTS.Version,
                        BTS.GSMCommon,
+                       BTS.Logger,
                        BTS.RadioDevice,
                        BTS.RadioInterface,
-                       BTS.RadioDevice.NullDevice
+                       BTS.RadioDevice.NullDevice,
+                       BTS.RadioDevice.BladeRFDevice
   other-modules:       GitRev,
                        Paths_BTS
-  build-depends:       base, ansi-terminal, pretty, time, transformers, mtl
+  build-depends:       base, ansi-terminal, pretty, time, transformers, mtl, hlibBladeRF, hslogger
 --  build-depends:       base ==4.6.*, mtl ==2.2.*, transformers ==0.4.*, hslogger ==1.2.*, hlibBladeRF ==0.1.*, network ==2.6.*, time ==1.4.*, ansi-wl-pprint ==0.6.*, lens ==4.7.*, template-haskell ==2.8.*, containers ==0.5.*
   hs-source-dirs:      src
 
--- executable sideterm
---   main-is:             Main.hs
---   other-modules:       REPL.Logo,
---                        REPL.Monad,
---                        REPL.Trie,
---                        REPL.Command,
---                        REPL.Haskeline,
---                        Paths_sideterm
---   build-depends:       base,
---                        sideterm,
---                        containers,
---                        transformers,
---                        haskeline,
---                        filepath,
---                        directory,
---                        process,
---                        ansi-terminal
---   hs-source-dirs:      sideterm
+executable bts
+  main-is:             Main.hs
+  other-modules:       Paths_BTS
+  build-depends:       base, transformers, mtl,
+                       BTS
+  hs-source-dirs:      bts
