@@ -23,7 +23,7 @@ library
                        BTS.GSMCommon,
                        BTS.RadioDevice,
                        BTS.RadioInterface,
-                       BTS.RadioDrivers.NullDevice
+                       BTS.RadioDevice.NullDevice
   other-modules:       GitRev,
                        Paths_BTS
   build-depends:       base, ansi-terminal, pretty, time, transformers, mtl

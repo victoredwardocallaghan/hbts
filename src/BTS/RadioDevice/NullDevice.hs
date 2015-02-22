@@ -10,7 +10,7 @@
 -}
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module BTS.RadioDrivers.NullDevice where
+module BTS.RadioDevice.NullDevice where
 
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Monad (ap)
