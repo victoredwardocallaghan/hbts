@@ -31,7 +31,6 @@ import LibBladeRF.Gpio
 import LibBladeRF.Gain
 import LibBladeRF.Frequency
 import LibBladeRF.Utils
-import LibBladeRF.Misc
 import LibBladeRF.Types
 
 --
@@ -49,8 +48,8 @@ choiceFPGA FPGA_40KLE   = "hostedx40.rbf"
 choiceFPGA FPGA_115KLE  = "hostedx115.rbf"
 
 -- | ..
-getFPGAName :: BladeRF String
-getFPGAName = fmap choiceFPGA bladeRFGetFPGASize
+getFPGAName :: DeviceHandle -> IO String
+getFPGAName dev = fmap choiceFPGA (bladeRFGetFPGASize dev)
 
 
 loggerName :: String
@@ -145,10 +144,10 @@ constructBladeRFDevice = do
                             , setTxGain             = \g _ -> liftIO . void $ bladeRFSetTxGain (round g)
                             , getRxGain             = bladeRFGetRxGain
                             -- **
-                            , getMaxRxGain          = return $ fromIntegral bladeRFGetMaxRxGain
-                            , getMinRxGain          = return $ fromIntegral bladeRFGetMinRxGain
-                            , getMaxTxGain          = return $ fromIntegral bladeRFGetMaxTxGain
-                            , getMinTxGain          = return $ fromIntegral bladeRFGetMinTxGain
+                            , getMaxRxGain          = fromIntegral bladeRFGetMaxRxGain
+                            , getMinRxGain          = fromIntegral bladeRFGetMinRxGain
+                            , getMaxTxGain          = fromIntegral bladeRFGetMaxTxGain
+                            , getMinTxGain          = fromIntegral bladeRFGetMinTxGain
                             -- **
                             , getTxFreq             = return 0
                             , getRxFreq             = return 0
@@ -183,17 +182,17 @@ bladeRFDeviceWriteSamples = undefined
 
 -- XXXXXXXXXXX wacky types need to use (liftIO . void) everywhere to strip out the Either from the IO () action and then lift it..
 --bladeRFDeviceStart :: BladeRFDevice ()
-bladeRFDeviceStart = withBladeRF $ do
-  speed <- bladeRFDeviceSpeed
-  noticeBladeRF loggerName $ "starting bladeRF in  " ++ show speed ++ " speed mode..."
-  bladeRFEnableModule MODULE_RX True
-  bladeRFEnableModule MODULE_TX True
+bladeRFDeviceStart = withBladeRF $ \dev -> do
+  speed <- bladeRFDeviceSpeed dev
+  noticeM loggerName $ "starting bladeRF in  " ++ show speed ++ " speed mode..."
+  bladeRFEnableModule dev MODULE_RX True
+  bladeRFEnableModule dev MODULE_TX True
 
 --bladeRFDeviceStop :: BladeRFDevice ()
-bladeRFDeviceStop = withBladeRF $ do
-  noticeBladeRF loggerName "stopping bladeRF"
-  bladeRFEnableModule MODULE_RX False
-  bladeRFEnableModule MODULE_TX False
+bladeRFDeviceStop = withBladeRF $ \dev -> do
+  noticeM loggerName "stopping bladeRF"
+  bladeRFEnableModule dev MODULE_RX False
+  bladeRFEnableModule dev MODULE_TX False
 
 
 -- | Read internal states
@@ -211,27 +210,26 @@ bladeRFNumberWritten :: BladeRFDevice Integer
 bladeRFNumberWritten  = BladeRFDevice $ gets samplesWritten
 
 
---main  = withBladeRF $ withBTSLogger loggerName $ do
-bladeRFOpen = withBladeRF $ do
+bladeRFOpen = withBladeRF $ \dev -> do
   initLogger loggerName
-  infoBladeRF loggerName "Creating bladeRF Device..."
+  infoM loggerName "Creating bladeRF Device..."
   -- sps = oversampling
   --
   --
 
   libVersion <- liftIO bladeRFLibVersion
-  infoBladeRF loggerName (" libbladeRF version: " ++ show libVersion)
-  serial <- bladeRFGetSerial
-  fwVersion <- bladeRFFwVersion
-  infoBladeRF loggerName $ " Opened bladeRF Serial= " ++ show serial ++ " firmware version " ++ show fwVersion
+  infoM loggerName (" libbladeRF version: " ++ show libVersion)
+  serial <- bladeRFGetSerial dev
+  fwVersion <- bladeRFFwVersion dev
+  infoM loggerName $ " Opened bladeRF Serial= " ++ show serial ++ " firmware version " ++ show fwVersion
 
 --  fpgaName <- liftIO $ return (choiceFPGA bladeRFGetFPGASize)
 
-  bladeRFLoadFPGA =<< getFPGAName
-  fpgaName <- getFPGAName
+  (bladeRFLoadFPGA dev) =<< (getFPGAName dev)
+  fpgaName <- getFPGAName dev
 
-  fpgaVersion <- bladeRFFPGAVersion
-  noticeBladeRF loggerName $ " bladeRF FPGA  " ++ show fpgaName ++ " is loaded with version " ++ show fpgaVersion
+  fpgaVersion <- bladeRFFPGAVersion dev
+  noticeM loggerName $ " bladeRF FPGA  " ++ show fpgaName ++ " is loaded with version " ++ show fpgaVersion
 
   --
   -- Set Sampling Rate
@@ -241,43 +239,43 @@ bladeRFOpen = withBladeRF $ do
   let numer = (sps * 13^8) - (whole * 48)
   let rate = BladeRFRationalRate { integer = whole, num = numer, den = 48 }
 
-  infoBladeRF loggerName $ "Setting rate = " ++ show (integer rate)  ++ " + " ++ show (num rate) ++ " / " ++ show (den rate)
-  realRate <- bladeRFSetRationalSampleRate MODULE_RX rate
-  infoBladeRF loggerName $ "Actual RX rate = " ++ show (integer realRate)  ++ " + " ++ show (num realRate) ++ " / " ++ show (den realRate)
-  realRate <- bladeRFSetRationalSampleRate MODULE_TX rate
-  infoBladeRF loggerName $ "Actual TX rate = " ++ show (integer realRate)  ++ " + " ++ show (num realRate) ++ " / " ++ show (den realRate)
+  infoM loggerName $ "Setting rate = " ++ show (integer rate)  ++ " + " ++ show (num rate) ++ " / " ++ show (den rate)
+  realRate <- bladeRFSetRationalSampleRate dev MODULE_RX rate
+  infoM loggerName $ "Actual RX rate = " ++ show (integer realRate)  ++ " + " ++ show (num realRate) ++ " / " ++ show (den realRate)
+  realRate <- bladeRFSetRationalSampleRate dev MODULE_TX rate
+  infoM loggerName $ "Actual TX rate = " ++ show (integer realRate)  ++ " + " ++ show (num realRate) ++ " / " ++ show (den realRate)
 
   --
   -- Set Bandwidth
   --
-  infoBladeRF loggerName $ "Setting bandwidth = " ++ show (fromIntegral bandwidth / 10^6) ++ " Mhz"
-  realBandwidth <- bladeRFSetBandwidth MODULE_RX bandwidth
-  infoBladeRF loggerName $ "Actual RX bandwidth = " ++ show (fromIntegral realBandwidth / 10^6) ++ " MHz"
-  realBandwidth <- bladeRFSetBandwidth MODULE_TX bandwidth
-  infoBladeRF loggerName $ "Actual TX bandwidth = " ++ show (fromIntegral realBandwidth / 10^6) ++ " MHz"
+  infoM loggerName $ "Setting bandwidth = " ++ show (fromIntegral bandwidth / 10^6) ++ " Mhz"
+  realBandwidth <- bladeRFSetBandwidth dev MODULE_RX bandwidth
+  infoM loggerName $ "Actual RX bandwidth = " ++ show (fromIntegral realBandwidth / 10^6) ++ " MHz"
+  realBandwidth <- bladeRFSetBandwidth dev MODULE_TX bandwidth
+  infoM loggerName $ "Actual TX bandwidth = " ++ show (fromIntegral realBandwidth / 10^6) ++ " MHz"
 
   --
   -- Set Sync Configuration
   --
-  bladeRFSyncConfig MODULE_RX FORMAT_SC16_Q11 defaultStreamRXBuffers defaultStreamSamples defaultStreamRXXFERS defaultStreamTimeout
-  bladeRFSyncConfig MODULE_TX FORMAT_SC16_Q11 defaultStreamRXBuffers defaultStreamSamples defaultStreamTXXFERS defaultStreamTimeout
+  bladeRFSyncConfig dev MODULE_RX FORMAT_SC16_Q11 defaultStreamRXBuffers defaultStreamSamples defaultStreamRXXFERS defaultStreamTimeout
+  bladeRFSyncConfig dev MODULE_TX FORMAT_SC16_Q11 defaultStreamRXBuffers defaultStreamSamples defaultStreamTXXFERS defaultStreamTimeout
 
   --
   -- Setup GPIO's for timestamping
   --
-  gpios <- bladeRFConfigGPIORead
-  bladeRFConfigGPIOWrite $ gpios .|. c'BLADERF_GPIO_TIMESTAMP
---  gpios <- bladeRFConfigGPIORead
---  if (gpios .&. c'BLADERF_GPIO_TIMESTAMP) == c'BLADERF_GPIO_TIMESTAMP
---  then noticeBladeRF loggerName "bladeRF timestamping enabled."
---  else alertBladeRF loggerName "Could not enable timestamping."
+  gpios <- bladeRFConfigGPIORead dev
+  bladeRFConfigGPIOWrite dev $ gpios .|. c'BLADERF_GPIO_TIMESTAMP
+  gpios <- bladeRFConfigGPIORead dev
+  if (gpios .&. c'BLADERF_GPIO_TIMESTAMP) == c'BLADERF_GPIO_TIMESTAMP
+   then noticeM loggerName "bladeRF timestamping enabled."
+   else alertM loggerName "Could not enable timestamping."
 
   --
   -- Set initial gains to minimum, the transceiver will adjust them later
   --
-  -- XXX why do we even need to lift lol?? no seriously wtf??
-  liftIO $ bladeRFSetTxGain bladeRFGetMinTxGain
-  liftIO $ bladeRFSetRxGain bladeRFGetMinRxGain
+  -- XXX this breaks this WHY???????????
+--  bladeRFSetTxGain bladeRFGetMinTxGain
+--  bladeRFSetRxGain bladeRFGetMinRxGain
 
 
 -- | return maximum Rx Gain
@@ -297,46 +295,46 @@ bladeRFGetMinTxGain = fromEnum TXVGA2_GAIN_MIN
 
 --
 -- | Pass gain in dB's
-bladeRFSetTxGain g = withBladeRF $ do
-  bladeRFSetTXVGA1 $ fromEnum TXVGA1_GAIN_MAX
-  bladeRFSetTXVGA2 g
-  infoBladeRF loggerName $ "TX gain set to " ++ show g ++ " dB."
+bladeRFSetTxGain g = withBladeRF $ \dev -> do
+  bladeRFSetTXVGA1 dev $ fromEnum TXVGA1_GAIN_MAX
+  bladeRFSetTXVGA2 dev g
+  infoM loggerName $ "TX gain set to " ++ show g ++ " dB."
 
 --
 -- | Pass gain in dB's
-bladeRFSetRxGain g = withBladeRF $ do
-  bladeRFSetRXVGA1 $ fromEnum RXVGA1_GAIN_MAX
-  bladeRFSetRXVGA2 g
-  infoBladeRF loggerName $ "RX gain set to " ++ show g ++ " dB."
+bladeRFSetRxGain g = withBladeRF $ \dev -> do
+  bladeRFSetRXVGA1 dev $ fromEnum RXVGA1_GAIN_MAX
+  bladeRFSetRXVGA2 dev g
+  infoM loggerName $ "RX gain set to " ++ show g ++ " dB."
 
 --
 -- | Set the VCTCXO offset
-bladeRFSetVCTCXO d = withBladeRF $ do
-  infoBladeRF loggerName $ "set VCTCXO: " ++ show d
-  bladeRFDACWrite $ shiftL d 8
+bladeRFSetVCTCXO d = withBladeRF $ \dev -> do
+  infoM loggerName $ "set VCTCXO: " ++ show d
+  bladeRFDACWrite dev $ shiftL d 8
 
 --
 -- | Set the transmitter frequency
-bladeRFSetTxFreq f d = withBladeRF $ do
-  infoBladeRF loggerName $ "set Tx freq: " ++ show f ++ " correction: " ++ show d
-  bladeRFSetFrequency MODULE_TX f
-  liftIO $ bladeRFSetVCTCXO d
+bladeRFSetTxFreq f d = withBladeRF $ \dev -> do
+  infoM loggerName $ "set Tx freq: " ++ show f ++ " correction: " ++ show d
+  bladeRFSetFrequency dev MODULE_TX f
+  bladeRFSetVCTCXO d
 
 --
 -- | Set the receiver frequency
-bladeRFSetRxFreq f d = withBladeRF $ do
-  infoBladeRF loggerName $ "set Rx freq: " ++ show f ++ " correction: " ++ show d
-  bladeRFSetFrequency MODULE_RX f
-  liftIO $ bladeRFSetVCTCXO d
+bladeRFSetRxFreq f d = withBladeRF $ \dev -> do
+  infoM loggerName $ "set Rx freq: " ++ show f ++ " correction: " ++ show d
+  bladeRFSetFrequency dev MODULE_RX f
+  bladeRFSetVCTCXO d
 
 -- XXX (internal function)
 -- | Set the TX DAC correction offsets
-bladeRFSetTxOffsets corrI corrQ = withBladeRF $ do
-  bladeRFSetCorrection MODULE_TX CORR_LMS_DCOFF_I (shiftL shiftTxDC corrI)
-  bladeRFSetCorrection MODULE_TX CORR_LMS_DCOFF_Q (shiftL shiftTxDC corrQ)
+bladeRFSetTxOffsets corrI corrQ = withBladeRF $ \dev -> do
+  bladeRFSetCorrection dev MODULE_TX CORR_LMS_DCOFF_I (shiftL shiftTxDC corrI)
+  bladeRFSetCorrection dev MODULE_TX CORR_LMS_DCOFF_Q (shiftL shiftTxDC corrQ)
 
 -- XXX (internal function)
 -- | Set the RX DAC correction offsets
-bladeRFSetRxOffsets corrI corrQ = withBladeRF $ do
-  bladeRFSetCorrection MODULE_RX CORR_LMS_DCOFF_I (shiftL shiftRxDC corrI)
-  bladeRFSetCorrection MODULE_RX CORR_LMS_DCOFF_Q (shiftL shiftRxDC corrQ)
+bladeRFSetRxOffsets corrI corrQ = withBladeRF $ \dev -> do
+  bladeRFSetCorrection dev MODULE_RX CORR_LMS_DCOFF_I (shiftL shiftRxDC corrI)
+  bladeRFSetCorrection dev MODULE_RX CORR_LMS_DCOFF_Q (shiftL shiftRxDC corrQ)

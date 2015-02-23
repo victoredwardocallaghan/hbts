@@ -99,10 +99,10 @@ constructNullDevice = do
                             , setTxGain             = undefined
                             , getRxGain             = return 0.0
                             -- **
-                            , getMaxRxGain          = return 0.0
-                            , getMinRxGain          = return 0.0
-                            , getMaxTxGain          = return 0.0
-                            , getMinTxGain          = return 0.0
+                            , getMaxRxGain          = 0.0
+                            , getMinRxGain          = 0.0
+                            , getMaxTxGain          = 0.0
+                            , getMinTxGain          = 0.0
                             -- **
                             , getTxFreq             = nullDeviceGetTxFreq
                             , getRxFreq             = nullDeviceGetRxFreq

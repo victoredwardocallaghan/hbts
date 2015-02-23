@@ -24,10 +24,10 @@ data RadioDevice m = RadioDevice { withRadioDevice       :: Double -> m () -> IO
                                  , setTxGain             :: Double -> Double -> m () -- ^ sets the transmit chan gain, returns the gain setting
                                  , getRxGain             :: m Double                 -- ^ gets the current receive gain
                                  --
-                                 , getMaxRxGain          :: m Double                 -- ^ return maximum Rx Gain
-                                 , getMinRxGain          :: m Double                 -- ^ return minimum Rx Gain
-                                 , getMaxTxGain          :: m Double                 -- ^ return maximum Tx Gain
-                                 , getMinTxGain          :: m Double                 -- ^ return minimum Tx Gain
+                                 , getMaxRxGain          :: Double                   -- ^ return maximum Rx Gain
+                                 , getMinRxGain          :: Double                   -- ^ return minimum Rx Gain
+                                 , getMaxTxGain          :: Double                   -- ^ return maximum Tx Gain
+                                 , getMinTxGain          :: Double                   -- ^ return minimum Tx Gain
                                  -- ** Return internal status values
                                  , getTxFreq             :: m Double
                                  , getRxFreq             :: m Double
