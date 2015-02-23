@@ -78,7 +78,7 @@ get  = undefined
 
 -- | The basestation clock
 data RadioClock = RadioClock { rclock :: Time
-                             , signal :: Int  -- ^ XXX fix type?? pthread_cond_broadcast()
+                             , signal :: Int  -- ^ XXX fix type?? pthread_cond_broadcast() properly dont need this at all??
                              }
 
 -- | Get clock value

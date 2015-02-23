@@ -57,7 +57,6 @@ loggerName :: String
 loggerName = "DeviceBladeRF.hs"
 
 
-
 -- Stream defaults
 defaultStreamRXXFERS   =    1
 defaultStreamRXBuffers =    8
@@ -69,6 +68,12 @@ defaultStreamTimeout   =  500
 -- .
 shiftTxDC = 4
 shiftRxDC = 5
+maxRxDCOffset = 63
+maxTxDCOffset = 63
+
+gRxOffsetError    = 10
+gRxOffsetCoef     = 1.5
+gRxAverageDamping = 1024
 
 bandwidth = 1500000
 
@@ -78,7 +83,7 @@ bandwidth = 1500000
 data RxDCOffsetParams = RxDCOffsetParams { mDCCorrect     :: Bool
                                          , mRxMaxOffset   :: Int
                                          , mRxCorrectionI :: Int
-                                         , mRxCorrection  :: Int
+                                         , mRxCorrectionQ :: Int
                                          , mRxAverageI    :: Int
                                          , mRxAverageQ    :: Int
                                          }
@@ -111,7 +116,12 @@ instance Applicative BladeRFDevice where
 
 -- | Internal initial state-object constructor
 runBladeRFDevice :: Double -> BladeRFDevice a -> IO a
-runBladeRFDevice sr m = evalStateT (unBladeRFDevice m) (HwState sr 0.0 0 0 1 1 0 False 0 False (RxDCOffsetParams False 0 0 0 0 0))
+runBladeRFDevice sr m = evalStateT (unBladeRFDevice m) (HwState sr 0.0 0 0 1 1 0 False 0 False (RxDCOffsetParams True (gRxOffsetError * gRxAverageDamping) (maxRxDCOffset + 1) (maxRxDCOffset + 1) 0 0))
+
+-- initial states
+-- setRxOffsets(gConfig.getNum("TRX.RX.OffsetI"), gConfig.getNum("TRX.RX.OffsetQ"));
+-- setTxOffsets(gConfig.getNum("TRX.TX.OffsetI"), gConfig.getNum("TRX.TX.OffsetQ"));
+-- mRxGain1 = BLADERF_RXVGA1_GAIN_MAX;
 
 bracket start stop body = do
      (liftIO . void) start
@@ -135,16 +145,16 @@ constructBladeRFDevice = do
                             , setTxGain             = \g _ -> liftIO . void $ bladeRFSetTxGain (round g)
                             , getRxGain             = bladeRFGetRxGain
                             -- **
-                            , getMaxRxGain          = return $ (fromIntegral . fromEnum) RXVGA2_GAIN_MAX
-                            , getMinRxGain          = return $ (fromIntegral . fromEnum) RXVGA2_GAIN_MIN
-                            , getMaxTxGain          = return $ (fromIntegral . fromEnum) TXVGA2_GAIN_MAX
-                            , getMinTxGain          = return $ (fromIntegral . fromEnum) TXVGA2_GAIN_MIN
+                            , getMaxRxGain          = return $ fromIntegral bladeRFGetMaxRxGain
+                            , getMinRxGain          = return $ fromIntegral bladeRFGetMinRxGain
+                            , getMaxTxGain          = return $ fromIntegral bladeRFGetMaxTxGain
+                            , getMinTxGain          = return $ fromIntegral bladeRFGetMinTxGain
                             -- **
                             , getTxFreq             = return 0
                             , getRxFreq             = return 0
-                            , getSampleRate         = bladeRFDeviceGetSampleRate
-                            , numberRead            = bladeRFDeviceNumberRead
-                            , numberWritten         = bladeRFDeviceNumberWritten
+                            , getSampleRate         = bladeRFGetSampleRate
+                            , numberRead            = bladeRFNumberRead
+                            , numberWritten         = bladeRFNumberWritten
                             -- **
                             , updateAlignment       = undefined -- ^ Assume bladeRF never goes out of alignment
                             -- **
@@ -176,14 +186,14 @@ bladeRFDeviceWriteSamples = undefined
 bladeRFDeviceStart = withBladeRF $ do
   speed <- bladeRFDeviceSpeed
   noticeBladeRF loggerName $ "starting bladeRF in  " ++ show speed ++ " speed mode..."
---  bladeRFEnableModule MODULE_RX True
---  bladeRFEnableModule MODULE_TX True
+  bladeRFEnableModule MODULE_RX True
+  bladeRFEnableModule MODULE_TX True
 
 --bladeRFDeviceStop :: BladeRFDevice ()
 bladeRFDeviceStop = withBladeRF $ do
   noticeBladeRF loggerName "stopping bladeRF"
---  bladeRFEnableModule MODULE_RX False
---  bladeRFEnableModule MODULE_TX False
+  bladeRFEnableModule MODULE_RX False
+  bladeRFEnableModule MODULE_TX False
 
 
 -- | Read internal states
@@ -191,14 +201,14 @@ bladeRFDeviceStop = withBladeRF $ do
 bladeRFGetRxGain :: BladeRFDevice Double
 bladeRFGetRxGain  = BladeRFDevice $ gets rxGain
 
-bladeRFDeviceGetSampleRate :: BladeRFDevice Double
-bladeRFDeviceGetSampleRate  = BladeRFDevice $ gets aSampleRate
+bladeRFGetSampleRate :: BladeRFDevice Double
+bladeRFGetSampleRate  = BladeRFDevice $ gets aSampleRate
 
-bladeRFDeviceNumberRead :: BladeRFDevice Integer
-bladeRFDeviceNumberRead  = BladeRFDevice $ gets samplesRead
+bladeRFNumberRead :: BladeRFDevice Integer
+bladeRFNumberRead  = BladeRFDevice $ gets samplesRead
 
-bladeRFDeviceNumberWritten :: BladeRFDevice Integer
-bladeRFDeviceNumberWritten  = BladeRFDevice $ gets samplesWritten
+bladeRFNumberWritten :: BladeRFDevice Integer
+bladeRFNumberWritten  = BladeRFDevice $ gets samplesWritten
 
 
 --main  = withBladeRF $ withBTSLogger loggerName $ do
@@ -261,6 +271,28 @@ bladeRFOpen = withBladeRF $ do
 --  if (gpios .&. c'BLADERF_GPIO_TIMESTAMP) == c'BLADERF_GPIO_TIMESTAMP
 --  then noticeBladeRF loggerName "bladeRF timestamping enabled."
 --  else alertBladeRF loggerName "Could not enable timestamping."
+
+  --
+  -- Set initial gains to minimum, the transceiver will adjust them later
+  --
+  -- XXX why do we even need to lift lol?? no seriously wtf??
+  liftIO $ bladeRFSetTxGain bladeRFGetMinTxGain
+  liftIO $ bladeRFSetRxGain bladeRFGetMinRxGain
+
+
+-- | return maximum Rx Gain
+bladeRFGetMaxRxGain, bladeRFGetMinRxGain :: Int
+bladeRFGetMaxRxGain = fromEnum RXVGA2_GAIN_MAX
+
+-- | return minimum Rx Gain
+bladeRFGetMinRxGain = fromEnum RXVGA2_GAIN_MIN
+
+-- | return maximum Tx Gain
+bladeRFGetMaxTxGain, bladeRFGetMinTxGain :: Int
+bladeRFGetMaxTxGain = fromEnum TXVGA2_GAIN_MAX
+
+-- | return minimum Tx Gain
+bladeRFGetMinTxGain = fromEnum TXVGA2_GAIN_MIN
 
 
 --
