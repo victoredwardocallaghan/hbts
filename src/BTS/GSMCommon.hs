@@ -136,7 +136,7 @@ gsmbands = [ (GSM850,   850)
 
 -- | Codes for logical channel types.
 data ChannelType =
-                 -- * Non-dedicated control channels.
+                 -- | Non-dedicated control channels.
                    SCHType   -- ^ sync
                  | FCCHType  -- ^ frequency correction
                  | BCCHType  -- ^ broadcast control
@@ -145,28 +145,28 @@ data ChannelType =
                  | SACCHType -- ^ slow associated control (acutally dedicated, but...)
                  | CBCHType  -- ^ cell broadcast channel
         
-                 -- * Dedicated control channels (DCCHs).
+                 -- | Dedicated control channels (DCCHs).
                  | SDCCHType -- ^ standalone dedicated control
                  | FACCHType -- ^ fast associated control
 
-                 -- * Traffic channels
+                 -- | Traffic channels
                  | TCHFType   -- ^ full-rate traffic
                  | TCHHType   -- ^ half-rate traffic
                  | AnyTCHType -- ^ any TCH type
                  
-                 -- * Packet channels for GPRS.
+                 -- | Packet channels for GPRS.
                  | PDTCHCS1Type
                  | PDTCHCS2Type
                  | PDTCHCS3Type
                  | PDTCHCS4Type
                  
-                 -- * Packet CHANNEL REQUEST responses
+                 -- | Packet CHANNEL REQUEST responses
                  --   These are used only as return value from decodeChannelNeeded(), and do not correspond
                  --   to any logical channels.
                  | PSingleBlock1PhaseType
                  | PSingleBlock2PhaseType
                  
-                 -- * Special internal channel types.
+                 -- | Special internal channel types.
                  | LoopbackFullType -- ^ loopback testing
                  | LoopbackHalfType -- ^ loopback testing
                  | AnyDCCHType      -- ^ any dedicated control channel
@@ -224,25 +224,25 @@ instance Show MobileIDType where
 -- | Type and TDMA offset of a logical channel, from GSM 04.08 10.5.2.5
 data TypeAndOffset = TDMA_MISC
                    | TCHF_0
-                   -- * ..
+                   -- | ..
                    | TCHH_0
                    | TCHH_1
-                   -- * ..
+                   -- | ..
                    | SDCCH_4_0
                    | SDCCH_4_1
                    | SDCCH_4_2
                    | SDCCH_4_3
-                   -- * ..
+                   -- | ..
                    | SDCCH_8_0
                    | SDCCH_8_1
                    | SDCCH_8_2
                    | SDCCH_8_3
-                   -- * ..
+                   -- | ..
                    | SDCCH_8_4
                    | SDCCH_8_5
                    | SDCCH_8_6
                    | SDCCH_8_7
-                   -- Some extra ones for our internal use.
+                   -- | Some extra ones for our internal use.
                    | TDMA_BEACON_BCCH
                    | TDMA_BEACON_CCCH
                    | TDMA_BEACON
@@ -386,7 +386,7 @@ fnDelta u v =
     halfModulus = hyperframe `div` 2
 
 -- | Compare two frame clock values.
---   @return 1 if v1>v2, -1 if v1<v2, 0 if v1==v2
+--   return 1 if v1>v2, -1 if v1<v2, 0 if v1==v2
 fnCompare :: Int -> Int -> Int
 fnCompare u v | fnDelta u v > 0 = 1
               | fnDelta u v < 0 = -1

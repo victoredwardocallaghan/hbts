@@ -94,30 +94,30 @@ constructNullDevice = do
                             , setVCTCXO             = undefined
                             , setTxFreq             = nullDeviceSetTxFreq
                             , setRxFreq             = nullDeviceSetRxFreq
-                            -- **
+                            -- ..
                             , setRxGain             = undefined
                             , setTxGain             = undefined
                             , getRxGain             = return 0.0
-                            -- **
+                            -- ..
                             , getMaxRxGain          = 0.0
                             , getMinRxGain          = 0.0
                             , getMaxTxGain          = 0.0
                             , getMinTxGain          = 0.0
-                            -- **
+                            -- ..
                             , getTxFreq             = 0
                             , getRxFreq             = 0
                             , getSampleRate         = nullDeviceGetSampleRate
                             , numberRead            = nullDeviceNumberRead
                             , numberWritten         = nullDeviceNumberWritten
-                            -- **
+                            -- ..
                             , updateAlignment       = nullDeviceUpdateAlignment
-                            -- **
-                            , initialWriteTimestamp = 20000 -- ^ Returns the starting write Timestamp
-                            , initialReadTimestamp  = 20000 -- ^ Returns the starting read Timestamp
-                            -- **
-                            , fullScaleInputValue   = 13500.0 -- ^ returns the full-scale transmit amplitude
-                            , fullScaleOutputValue  = 9450.0  -- ^ returns the full-scale receive amplitude
-                            -- **
+                            -- ..
+                            , initialWriteTimestamp = 20000 -- Returns the starting write Timestamp
+                            , initialReadTimestamp  = 20000 -- Returns the starting read Timestamp
+                            -- ..
+                            , fullScaleInputValue   = 13500.0 -- returns the full-scale transmit amplitude
+                            , fullScaleOutputValue  = 9450.0  -- returns the full-scale receive amplitude
+                            -- ..
                             , readSamples           = nullDeviceReadSamples
                             , writeSamples          = nullDeviceWriteSamples
                             }

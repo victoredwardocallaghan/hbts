@@ -139,30 +139,30 @@ constructBladeRFDevice = do
 --                            , setVCTCXO             = \d -> liftIO $ (>>= either throwIO return) $ bladeRFSetVCTCXO (fromIntegral d)
                             , setTxFreq             = \x y -> liftIO . void $ bladeRFSetTxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
                             , setRxFreq             = \x y -> liftIO . void $ bladeRFSetRxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
-                            -- **
+                            -- ..
                             , setRxGain             = \g _ -> liftIO . void $ bladeRFSetRxGain (round g)
                             , setTxGain             = \g _ -> liftIO . void $ bladeRFSetTxGain (round g)
                             , getRxGain             = bladeRFGetRxGain
-                            -- **
+                            -- ..
                             , getMaxRxGain          = fromIntegral bladeRFGetMaxRxGain
                             , getMinRxGain          = fromIntegral bladeRFGetMinRxGain
                             , getMaxTxGain          = fromIntegral bladeRFGetMaxTxGain
                             , getMinTxGain          = fromIntegral bladeRFGetMinTxGain
-                            -- **
+                            -- ..
                             , getTxFreq             = 0
                             , getRxFreq             = 0
                             , getSampleRate         = bladeRFGetSampleRate
                             , numberRead            = bladeRFNumberRead
                             , numberWritten         = bladeRFNumberWritten
-                            -- **
-                            , updateAlignment       = undefined -- ^ Assume bladeRF never goes out of alignment
-                            -- **
+                            -- ..
+                            , updateAlignment       = undefined -- Assume bladeRF never goes out of alignment
+                            -- ..
                             , initialWriteTimestamp = 1
                             , initialReadTimestamp  = 1
-                            -- **
+                            -- ..
                             , fullScaleInputValue   = 2040.0
                             , fullScaleOutputValue  = 2040.0
-                            -- **
+                            -- ..
                             , readSamples           = bladeRFDeviceReadSamples
                             , writeSamples          = bladeRFDeviceWriteSamples
                             }
