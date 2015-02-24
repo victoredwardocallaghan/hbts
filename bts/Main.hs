@@ -12,15 +12,16 @@ import Control.Monad.IO.Class
 --   My little pony (a boring test program in reality..)
 -- ------------------------------------------------------ --
 
+doit :: (MonadIO a) => RadioDevice a -> IO ()
 doit backend = withRadioDevice backend 99999 $ do
 --  writeSamples backend 3
   -- grab all the internal states of the device for testing..
-  initwts <- initialWriteTimestamp backend
-  initrts <- initialReadTimestamp backend
-  fsiv    <- fullScaleInputValue backend
-  fsov    <- fullScaleOutputValue backend
-  txfreq  <- getTxFreq backend
-  rxfreq  <- getRxFreq backend
+  let initwts = initialWriteTimestamp backend
+  let initrts = initialReadTimestamp backend
+  let fsiv    = fullScaleInputValue backend
+  let fsov    = fullScaleOutputValue backend
+  let txfreq  = getTxFreq backend
+  let rxfreq  = getRxFreq backend
   sr      <- getSampleRate backend
 --  nor     <- numberRead backend
 --  now     <- numberWritten backend
@@ -47,12 +48,12 @@ doit backend = withRadioDevice backend 99999 $ do
   --
   liftIO $ putStrLn "=============================================="
   -- grab all the internal states of the device for testing..
-  initwts <- initialWriteTimestamp backend
-  initrts <- initialReadTimestamp backend
-  fsiv    <- fullScaleInputValue backend
-  fsov    <- fullScaleOutputValue backend
-  txfreq  <- getTxFreq backend
-  rxfreq  <- getRxFreq backend
+  let initwts = initialWriteTimestamp backend
+  let initrts = initialReadTimestamp backend
+  let fsiv    = fullScaleInputValue backend
+  let fsov    = fullScaleOutputValue backend
+  let txfreq  = getTxFreq backend
+  let rxfreq  = getRxFreq backend
   sr      <- getSampleRate backend
 --  nor     <- numberRead backend
 --  now     <- numberWritten backend
@@ -68,7 +69,7 @@ doit backend = withRadioDevice backend 99999 $ do
 --  liftIO $ putStrLn $ "numberWritten " ++ (show now    )
 
 
+main :: IO ()
 main = do
---  backend <- liftIO constructNullDevice 
-  backend <- liftIO constructBladeRFDevice
-  doit backend
+  doit =<< constructBladeRFDevice
+  doit =<< constructNullDevice
