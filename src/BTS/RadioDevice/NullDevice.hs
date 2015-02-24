@@ -104,19 +104,19 @@ constructNullDevice = do
                             , getMaxTxGain          = 0.0
                             , getMinTxGain          = 0.0
                             -- **
-                            , getTxFreq             = nullDeviceGetTxFreq
-                            , getRxFreq             = nullDeviceGetRxFreq
+                            , getTxFreq             = 0
+                            , getRxFreq             = 0
                             , getSampleRate         = nullDeviceGetSampleRate
                             , numberRead            = nullDeviceNumberRead
                             , numberWritten         = nullDeviceNumberWritten
                             -- **
                             , updateAlignment       = nullDeviceUpdateAlignment
                             -- **
-                            , initialWriteTimestamp = nullDeviceInitialWriteTimestamp
-                            , initialReadTimestamp  = nullDeviceInitialReadTimestamp
+                            , initialWriteTimestamp = 20000 -- ^ Returns the starting write Timestamp
+                            , initialReadTimestamp  = 20000 -- ^ Returns the starting read Timestamp
                             -- **
-                            , fullScaleInputValue   = nullDeviceFullScaleInputValue
-                            , fullScaleOutputValue  = nullDeviceFullScaleOutputValue
+                            , fullScaleInputValue   = 13500.0 -- ^ returns the full-scale transmit amplitude
+                            , fullScaleOutputValue  = 9450.0  -- ^ returns the full-scale receive amplitude
                             -- **
                             , readSamples           = nullDeviceReadSamples
                             , writeSamples          = nullDeviceWriteSamples
@@ -166,29 +166,8 @@ nullDeviceSetTxFreq f a = return ()
 nullDeviceSetRxFreq :: Double -> Double -> NullDevice ()
 nullDeviceSetRxFreq f a = return ()
 
--- | Returns the starting write Timestamp
-nullDeviceInitialWriteTimestamp :: NullDevice TimeStamp
-nullDeviceInitialWriteTimestamp = return 20000
-
--- | Returns the starting read Timestamp
-nullDeviceInitialReadTimestamp :: NullDevice TimeStamp
-nullDeviceInitialReadTimestamp = return 20000
-
--- | returns the full-scale transmit amplitude
-nullDeviceFullScaleInputValue :: NullDevice Double
-nullDeviceFullScaleInputValue = return 13500.0
-
--- | returns the full-scale receive amplitude
-nullDeviceFullScaleOutputValue :: NullDevice Double
-nullDeviceFullScaleOutputValue = return 9450.0
 
 -- | Return internal status values
-nullDeviceGetTxFreq :: NullDevice Double
-nullDeviceGetTxFreq = return 0
-
-nullDeviceGetRxFreq :: NullDevice Double
-nullDeviceGetRxFreq = return 0
-
 nullDeviceGetSampleRate :: NullDevice Double
 nullDeviceGetSampleRate = NullDevice $ gets sampleRate
 

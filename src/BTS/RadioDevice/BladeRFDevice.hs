@@ -149,19 +149,19 @@ constructBladeRFDevice = do
                             , getMaxTxGain          = fromIntegral bladeRFGetMaxTxGain
                             , getMinTxGain          = fromIntegral bladeRFGetMinTxGain
                             -- **
-                            , getTxFreq             = return 0
-                            , getRxFreq             = return 0
+                            , getTxFreq             = 0
+                            , getRxFreq             = 0
                             , getSampleRate         = bladeRFGetSampleRate
                             , numberRead            = bladeRFNumberRead
                             , numberWritten         = bladeRFNumberWritten
                             -- **
                             , updateAlignment       = undefined -- ^ Assume bladeRF never goes out of alignment
                             -- **
-                            , initialWriteTimestamp = return 1
-                            , initialReadTimestamp  = return 1
+                            , initialWriteTimestamp = 1
+                            , initialReadTimestamp  = 1
                             -- **
-                            , fullScaleInputValue   = return 2040.0
-                            , fullScaleOutputValue  = return 2040.0
+                            , fullScaleInputValue   = 2040.0
+                            , fullScaleOutputValue  = 2040.0
                             -- **
                             , readSamples           = bladeRFDeviceReadSamples
                             , writeSamples          = bladeRFDeviceWriteSamples

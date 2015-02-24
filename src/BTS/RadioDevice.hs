@@ -29,19 +29,19 @@ data RadioDevice m = RadioDevice { withRadioDevice       :: Double -> m () -> IO
                                  , getMaxTxGain          :: Double                   -- ^ return maximum Tx Gain
                                  , getMinTxGain          :: Double                   -- ^ return minimum Tx Gain
                                  -- ** Return internal status values
-                                 , getTxFreq             :: m Double
-                                 , getRxFreq             :: m Double
+                                 , getTxFreq             :: Double
+                                 , getRxFreq             :: Double
                                  , getSampleRate         :: m Double
                                  , numberRead            :: m Integer
                                  , numberWritten         :: m Integer
                                  -- **
                                  , updateAlignment       :: TimeStamp -> m ()        -- ^ Update the alignment between the read and write timestamps
                                  -- **
-                                 , initialWriteTimestamp :: m TimeStamp              -- ^ Returns the starting write Timestamp
-                                 , initialReadTimestamp  :: m TimeStamp              -- ^ Returns the starting read Timestamp
+                                 , initialWriteTimestamp :: TimeStamp              -- ^ Returns the starting write Timestamp
+                                 , initialReadTimestamp  :: TimeStamp              -- ^ Returns the starting read Timestamp
                                  -- **
-                                 , fullScaleInputValue   :: m Double                 -- ^ returns the full-scale transmit amplitude
-                                 , fullScaleOutputValue  :: m Double                 -- ^ returns the full-scale receive amplitude
+                                 , fullScaleInputValue   :: Double                 -- ^ returns the full-scale transmit amplitude
+                                 , fullScaleOutputValue  :: Double                 -- ^ returns the full-scale receive amplitude
                                  -- ** Read/Write samples from the radio, returns the number of samples actually read/written.
                                  , readSamples  :: TimeStamp -> m ()
                                  , writeSamples :: TimeStamp -> m ()
