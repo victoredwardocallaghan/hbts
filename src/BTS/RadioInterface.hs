@@ -28,17 +28,17 @@ instance Ord RadioVector where
 
 -- | timestamp read and write operators
 readTime :: RadioVector -> Time
-readTime rv = time rv
+readTime  = time
 
 writeTime :: RadioVector -> Time -> RadioVector
 writeTime (RadioVector _ arfcn) time = RadioVector time arfcn
 
 -- | ARFCN read and write operators
 readARFCN :: RadioVector -> Int
-readARFCN rv = arfcn rv
+readARFCN  = arfcn
 
 writeARFCN :: RadioVector -> Int -> RadioVector
-writeARFCN (RadioVector time _) arfcn = RadioVector time arfcn
+writeARFCN (RadioVector time _) = RadioVector time
 
 
 
@@ -83,7 +83,7 @@ data RadioClock = RadioClock { rclock :: Time
 
 -- | Get clock value
 getClock :: RadioClock -> Time
-getClock rc = rclock rc
+getClock  = rclock
 
 -- | Set clock
 -- void set(const GSM::Time& wTime) { mClock = wTime; signal.broadcast(); }

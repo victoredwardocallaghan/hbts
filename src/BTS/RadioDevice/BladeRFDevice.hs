@@ -225,7 +225,7 @@ bladeRFOpen = withBladeRF $ \dev -> do
 
 --  fpgaName <- liftIO $ return (choiceFPGA bladeRFGetFPGASize)
 
-  (bladeRFLoadFPGA dev) =<< (getFPGAName dev)
+  bladeRFLoadFPGA dev =<< getFPGAName dev
   fpgaName <- getFPGAName dev
 
   fpgaVersion <- bladeRFFPGAVersion dev

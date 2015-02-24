@@ -1,4 +1,13 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-|
+  Module      : $Header$
+  Copyright   : (c) 2014 Edward O'Callaghan
+  License     : GPL-2
+  Maintainer  : eocallaghan@alterapraxis.com
+  Stability   : provisional
+  Portability : portable
+
+  ...
+-}
 
 module BTS.Logger ( initLogger
 -- XXX FIXME make this interface work properly and remove this..

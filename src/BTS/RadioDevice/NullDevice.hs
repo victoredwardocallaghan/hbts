@@ -134,13 +134,11 @@ constructNullDevice = do
 
 -- | Start the SDR
 nullDeviceStart :: NullDevice ()
-nullDeviceStart  = do
- liftIO $ putStrLn $ "INFO " ++ "starting SDR..."
+nullDeviceStart  = liftIO $ putStrLn $ "INFO " ++ "starting SDR..."
 
 -- | Stop the SDR
 nullDeviceStop :: NullDevice ()
-nullDeviceStop  = do
- liftIO $ putStrLn $ "INFO " ++ "stopping SDR..."
+nullDeviceStop  = liftIO $ putStrLn $ "INFO " ++ "stopping SDR..."
 
 -- | ..
 nullDeviceReadSamples :: TimeStamp -> NullDevice ()
