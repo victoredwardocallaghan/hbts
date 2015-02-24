@@ -9,20 +9,13 @@
   BladeRF hardware backend driver.
 -}
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module BTS.RadioDevice.BladeRFDevice where
 
 import Foreign hiding (void)
-import Foreign.C.Types
-import Foreign.C.String
-import Foreign.Ptr
 
-import Control.Applicative (Applicative(..), (<$>))
-import Control.Monad (ap, void)
-import Control.Monad.Trans
-import Control.Monad.Trans.State
-import Control.Monad.IO.Class
 -- import Control.Exception
+
+import Data.IORef
 
 import LibBladeRF.LibBladeRF
 import LibBladeRF.Sampling
@@ -88,34 +81,18 @@ data RxDCOffsetParams = RxDCOffsetParams { mDCCorrect     :: Bool
                                          }
 
 data HwState = HwState { sampleRate        :: Double    -- ^ the desired sampling rate
-                       , aSampleRate       :: Double    -- ^ the actual bladeRF sampling rate
-                       , samplesRead       :: Integer   -- ^ number of samples read from SDR
-                       , samplesWritten    :: Integer   -- ^ number of samples sent to SDR
                        , rxTimestamp       :: TimeStamp -- ^ ..?? 
                        , txTimestamp       :: TimeStamp -- ^ ..??
                        , rxResyncCandidate :: TimeStamp -- ^ ..??
                        , underRun          :: Bool      -- ^ ..
-                       , rxGain            :: Double    -- ^ ..??
                        , isSuperSpeed      :: Bool      -- ^ ..??
                        , rxDCOffsets       :: RxDCOffsetParams -- ^ Seriously think of a shorter name??????????????????????????????
                        }
 
-newtype BladeRFDevice a = BladeRFDevice { unBladeRFDevice :: StateT HwState IO a }
-                        deriving (Monad, MonadIO)
-
-instance Functor BladeRFDevice where
-  {-# INLINE fmap #-}
-  fmap f m = BladeRFDevice (f <$> unBladeRFDevice m)
-
-instance Applicative BladeRFDevice where
-  {-# INLINE pure #-}
-  pure  = return
-  {-# INLINE (<*>) #-}
-  (<*>) = ap
 
 -- | Internal initial state-object constructor
-runBladeRFDevice :: Double -> BladeRFDevice a -> IO a
-runBladeRFDevice sr m = evalStateT (unBladeRFDevice m) (HwState sr 0.0 0 0 1 1 0 False 0 False (RxDCOffsetParams True (gRxOffsetError * gRxAverageDamping) (maxRxDCOffset + 1) (maxRxDCOffset + 1) 0 0))
+--runBladeRFDevice :: Double -> BladeRFDevice a -> IO a
+--runBladeRFDevice sr m = evalStateT (unBladeRFDevice m) (HwState sr 1 1 0 False 0 False (RxDCOffsetParams True (gRxOffsetError * gRxAverageDamping) (maxRxDCOffset + 1) 0 0))
 
 -- initial states
 -- setRxOffsets(gConfig.getNum("TRX.RX.OffsetI"), gConfig.getNum("TRX.RX.OffsetQ"));
@@ -123,26 +100,36 @@ runBladeRFDevice sr m = evalStateT (unBladeRFDevice m) (HwState sr 0.0 0 0 1 1 0
 -- mRxGain1 = BLADERF_RXVGA1_GAIN_MAX;
 
 bracket start stop body = do
-     (liftIO . void) start
+     start
      body
-     (liftIO . void) stop
+     stop
 
--- | Object constructor
-withBladeRFDevice :: Double -> BladeRFDevice a -> IO ()
-withBladeRFDevice sr stuff = runBladeRFDevice sr $ bracket bladeRFDeviceStart bladeRFDeviceStop stuff
+---- | Object constructor
+withBladeRFDevice :: IO () -> IO ()
+withBladeRFDevice  = bracket bladeRFDeviceStart bladeRFDeviceStop
 
 -- | Construct an instance of the RadioDevice interface type with BladeRFDevice
-constructBladeRFDevice :: IO (RadioDevice BladeRFDevice)
-constructBladeRFDevice = do
+constructBladeRFDevice :: Double -> IO RadioDevice
+constructBladeRFDevice s = do
+  --
+  -- Read internal states
+  rxGainRef            <- newIORef (maxRxDCOffset + 1)
+  desiredSampleRateRef <- newIORef s   -- the desired bladeRF sampling rate
+  actualSampleRateRef  <- newIORef 0.0 -- the actual bladeRF sampling rate
+  samplesReadRef       <- newIORef 0   -- number of samples read from SDR
+  samplesWrittenRef    <- newIORef 0   -- number of samples sent to SDR
+
+  --
+  --
   let nulldev = RadioDevice { withRadioDevice       = withBladeRFDevice
-                            , setVCTCXO             = liftIO . void . bladeRFSetVCTCXO . fromIntegral
+                            , setVCTCXO             = bladeRFSetVCTCXO . fromIntegral
 --                            , setVCTCXO             = \d -> liftIO $ (>>= either throwIO return) $ bladeRFSetVCTCXO (fromIntegral d)
-                            , setTxFreq             = \x y -> liftIO . void $ bladeRFSetTxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
-                            , setRxFreq             = \x y -> liftIO . void $ bladeRFSetRxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
+                            , setTxFreq             = \x y -> bladeRFSetTxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
+                            , setRxFreq             = \x y -> bladeRFSetRxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
                             -- ..
-                            , setRxGain             = \g _ -> liftIO . void $ bladeRFSetRxGain (round g)
-                            , setTxGain             = \g _ -> liftIO . void $ bladeRFSetTxGain (round g)
-                            , getRxGain             = bladeRFGetRxGain
+                            , setRxGain             = \g _ -> bladeRFSetRxGain (round g)
+                            , setTxGain             = \g _ -> bladeRFSetTxGain (round g)
+                            , getRxGain             = readIORef rxGainRef
                             -- ..
                             , getMaxRxGain          = fromIntegral bladeRFGetMaxRxGain
                             , getMinRxGain          = fromIntegral bladeRFGetMinRxGain
@@ -151,9 +138,9 @@ constructBladeRFDevice = do
                             -- ..
                             , getTxFreq             = 0
                             , getRxFreq             = 0
-                            , getSampleRate         = bladeRFGetSampleRate
-                            , numberRead            = bladeRFNumberRead
-                            , numberWritten         = bladeRFNumberWritten
+                            , getSampleRate         = readIORef actualSampleRateRef
+                            , numberRead            = readIORef samplesReadRef
+                            , numberWritten         = readIORef samplesWrittenRef
                             -- ..
                             , updateAlignment       = undefined -- Assume bladeRF never goes out of alignment
                             -- ..
@@ -163,8 +150,8 @@ constructBladeRFDevice = do
                             , fullScaleInputValue   = 2040.0
                             , fullScaleOutputValue  = 2040.0
                             -- ..
-                            , readSamples           = bladeRFDeviceReadSamples
-                            , writeSamples          = bladeRFDeviceWriteSamples
+                            , readSamples           = bladeRFReadSamples
+                            , writeSamples          = bladeRFWriteSamples
                             }
   --
   --
@@ -173,57 +160,44 @@ constructBladeRFDevice = do
   return nulldev
 
 
-bladeRFDeviceReadSamples  = undefined
-bladeRFDeviceWriteSamples = undefined
+bladeRFReadSamples  = undefined
+bladeRFWriteSamples = undefined
 
 
 -- ..............................................
-
-
 -- XXXXXXXXXXX wacky types need to use (liftIO . void) everywhere to strip out the Either from the IO () action and then lift it..
---bladeRFDeviceStart :: BladeRFDevice ()
+
+
+-- | ..
+bladeRFDeviceStart :: IO ()
 bladeRFDeviceStart = withBladeRF $ \dev -> do
   speed <- bladeRFDeviceSpeed dev
   noticeM loggerName $ "starting bladeRF in  " ++ show speed ++ " speed mode..."
   bladeRFEnableModule dev MODULE_RX True
   bladeRFEnableModule dev MODULE_TX True
 
---bladeRFDeviceStop :: BladeRFDevice ()
+bladeRFDeviceStop :: IO ()
 bladeRFDeviceStop = withBladeRF $ \dev -> do
   noticeM loggerName "stopping bladeRF"
   bladeRFEnableModule dev MODULE_RX False
   bladeRFEnableModule dev MODULE_TX False
 
 
--- | Read internal states
-
-bladeRFGetRxGain :: BladeRFDevice Double
-bladeRFGetRxGain  = BladeRFDevice $ gets rxGain
-
-bladeRFGetSampleRate :: BladeRFDevice Double
-bladeRFGetSampleRate  = BladeRFDevice $ gets aSampleRate
-
-bladeRFNumberRead :: BladeRFDevice Integer
-bladeRFNumberRead  = BladeRFDevice $ gets samplesRead
-
-bladeRFNumberWritten :: BladeRFDevice Integer
-bladeRFNumberWritten  = BladeRFDevice $ gets samplesWritten
-
-
-bladeRFOpen = withBladeRF $ \dev -> do
+bladeRFOpen :: IO ()
+bladeRFOpen  = withBladeRF $ \dev -> do
   initLogger loggerName
   infoM loggerName "Creating bladeRF Device..."
   -- sps = oversampling
   --
   --
 
-  libVersion <- liftIO bladeRFLibVersion
+  libVersion <- bladeRFLibVersion
   infoM loggerName (" libbladeRF version: " ++ show libVersion)
   serial <- bladeRFGetSerial dev
   fwVersion <- bladeRFFwVersion dev
   infoM loggerName $ " Opened bladeRF Serial= " ++ show serial ++ " firmware version " ++ show fwVersion
 
---  fpgaName <- liftIO $ return (choiceFPGA bladeRFGetFPGASize)
+--  fpgaName <- return (choiceFPGA bladeRFGetFPGASize)
 
   bladeRFLoadFPGA dev =<< getFPGAName dev
   fpgaName <- getFPGAName dev
@@ -295,6 +269,7 @@ bladeRFGetMinTxGain = fromEnum TXVGA2_GAIN_MIN
 
 --
 -- | Pass gain in dB's
+bladeRFSetTxGain :: Int -> IO ()
 bladeRFSetTxGain g = withBladeRF $ \dev -> do
   bladeRFSetTXVGA1 dev $ fromEnum TXVGA1_GAIN_MAX
   bladeRFSetTXVGA2 dev g
@@ -302,6 +277,7 @@ bladeRFSetTxGain g = withBladeRF $ \dev -> do
 
 --
 -- | Pass gain in dB's
+bladeRFSetRxGain :: Int -> IO ()
 bladeRFSetRxGain g = withBladeRF $ \dev -> do
   bladeRFSetRXVGA1 dev $ fromEnum RXVGA1_GAIN_MAX
   bladeRFSetRXVGA2 dev g
@@ -309,12 +285,14 @@ bladeRFSetRxGain g = withBladeRF $ \dev -> do
 
 --
 -- | Set the VCTCXO offset
+bladeRFSetVCTCXO :: Word16 -> IO ()
 bladeRFSetVCTCXO d = withBladeRF $ \dev -> do
   infoM loggerName $ "set VCTCXO: " ++ show d
   bladeRFDACWrite dev $ shiftL d 8
 
 --
 -- | Set the transmitter frequency
+bladeRFSetTxFreq :: Int -> Word16 -> IO ()
 bladeRFSetTxFreq f d = withBladeRF $ \dev -> do
   infoM loggerName $ "set Tx freq: " ++ show f ++ " correction: " ++ show d
   bladeRFSetFrequency dev MODULE_TX f
@@ -322,6 +300,7 @@ bladeRFSetTxFreq f d = withBladeRF $ \dev -> do
 
 --
 -- | Set the receiver frequency
+bladeRFSetRxFreq :: Int -> Word16 -> IO ()
 bladeRFSetRxFreq f d = withBladeRF $ \dev -> do
   infoM loggerName $ "set Rx freq: " ++ show f ++ " correction: " ++ show d
   bladeRFSetFrequency dev MODULE_RX f
@@ -329,12 +308,14 @@ bladeRFSetRxFreq f d = withBladeRF $ \dev -> do
 
 -- XXX (internal function)
 -- | Set the TX DAC correction offsets
+bladeRFSetTxOffsets :: Int -> Int -> IO ()
 bladeRFSetTxOffsets corrI corrQ = withBladeRF $ \dev -> do
   bladeRFSetCorrection dev MODULE_TX CORR_LMS_DCOFF_I (shiftL shiftTxDC corrI)
   bladeRFSetCorrection dev MODULE_TX CORR_LMS_DCOFF_Q (shiftL shiftTxDC corrQ)
 
 -- XXX (internal function)
 -- | Set the RX DAC correction offsets
+bladeRFSetRxOffsets :: Int -> Int -> IO ()
 bladeRFSetRxOffsets corrI corrQ = withBladeRF $ \dev -> do
   bladeRFSetCorrection dev MODULE_RX CORR_LMS_DCOFF_I (shiftL shiftRxDC corrI)
   bladeRFSetCorrection dev MODULE_RX CORR_LMS_DCOFF_Q (shiftL shiftRxDC corrQ)

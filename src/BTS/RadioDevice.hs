@@ -15,37 +15,37 @@ import BTS.GSMCommon
 
 type TimeStamp = Integer -- ^ 64-bit virtual timestamp for radio data
 
-data RadioDevice m = RadioDevice { withRadioDevice       :: Double -> m () -> IO ()  -- ^ bracket pattern wrapper
-                                 , setVCTCXO             :: Int -> m ()              -- ^ Set the VCTCXO input voltage
-                                 , setTxFreq             :: Double -> Double -> m () -- ^ Set the transmitter frequency
-                                 , setRxFreq             :: Double -> Double -> m () -- ^ Set the receiver frequency
-                                 -- | ..
-                                 , setRxGain             :: Double -> Double -> m () -- ^ sets the receive chan gain, returns the gain setting
-                                 , setTxGain             :: Double -> Double -> m () -- ^ sets the transmit chan gain, returns the gain setting
-                                 , getRxGain             :: m Double                 -- ^ gets the current receive gain
-                                 -- | ..
-                                 , getMaxRxGain          :: Double                   -- ^ return maximum Rx Gain
-                                 , getMinRxGain          :: Double                   -- ^ return minimum Rx Gain
-                                 , getMaxTxGain          :: Double                   -- ^ return maximum Tx Gain
-                                 , getMinTxGain          :: Double                   -- ^ return minimum Tx Gain
-                                 -- | Return internal status values
-                                 , getTxFreq             :: Double
-                                 , getRxFreq             :: Double
-                                 , getSampleRate         :: m Double
-                                 , numberRead            :: m Integer
-                                 , numberWritten         :: m Integer
-                                 -- | ..
-                                 , updateAlignment       :: TimeStamp -> m ()        -- ^ Update the alignment between the read and write timestamps
-                                 -- | ..
-                                 , initialWriteTimestamp :: TimeStamp              -- ^ Returns the starting write Timestamp
-                                 , initialReadTimestamp  :: TimeStamp              -- ^ Returns the starting read Timestamp
-                                 -- | ..
-                                 , fullScaleInputValue   :: Double                 -- ^ returns the full-scale transmit amplitude
-                                 , fullScaleOutputValue  :: Double                 -- ^ returns the full-scale receive amplitude
-                                 -- | Read/Write samples from the radio, returns the number of samples actually read/written.
-                                 , readSamples  :: TimeStamp -> m ()
-                                 , writeSamples :: TimeStamp -> m ()
-                                 }
+data RadioDevice = RadioDevice { withRadioDevice       :: IO () -> IO ()            -- ^ bracket pattern wrapper
+                               , setVCTCXO             :: Int -> IO ()              -- ^ Set the VCTCXO input voltage
+                               , setTxFreq             :: Double -> Double -> IO () -- ^ Set the transmitter frequency
+                               , setRxFreq             :: Double -> Double -> IO () -- ^ Set the receiver frequency
+                               -- | ..
+                               , setRxGain             :: Double -> Double -> IO () -- ^ sets the receive chan gain, returns the gain setting
+                               , setTxGain             :: Double -> Double -> IO () -- ^ sets the transmit chan gain, returns the gain setting
+                               , getRxGain             :: IO Double                 -- ^ gets the current receive gain
+                               -- | ..
+                               , getMaxRxGain          :: Double                   -- ^ return maximum Rx Gain
+                               , getMinRxGain          :: Double                   -- ^ return minimum Rx Gain
+                               , getMaxTxGain          :: Double                   -- ^ return maximum Tx Gain
+                               , getMinTxGain          :: Double                   -- ^ return minimum Tx Gain
+                               -- | Return internal status values
+                               , getTxFreq             :: Double
+                               , getRxFreq             :: Double
+                               , getSampleRate         :: IO Double
+                               , numberRead            :: IO Integer
+                               , numberWritten         :: IO Integer
+                               -- | ..
+                               , updateAlignment       :: TimeStamp -> IO ()        -- ^ Update the alignment between the read and write timestamps
+                               -- | ..
+                               , initialWriteTimestamp :: TimeStamp              -- ^ Returns the starting write Timestamp
+                               , initialReadTimestamp  :: TimeStamp              -- ^ Returns the starting read Timestamp
+                               -- | ..
+                               , fullScaleInputValue   :: Double                 -- ^ returns the full-scale transmit amplitude
+                               , fullScaleOutputValue  :: Double                 -- ^ returns the full-scale receive amplitude
+                               -- | Read/Write samples from the radio, returns the number of samples actually read/written.
+                               , readSamples  :: TimeStamp -> IO ()
+                               , writeSamples :: TimeStamp -> IO ()
+                               }
 
 --  buf preallocated buf to contain read result
 --  len number of samples desired

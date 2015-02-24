@@ -12,8 +12,8 @@ import Control.Monad.IO.Class
 --   My little pony (a boring test program in reality..)
 -- ------------------------------------------------------ --
 
-doit :: (MonadIO a) => RadioDevice a -> IO ()
-doit backend = withRadioDevice backend 99999 $ do
+--doit :: (MonadIO a) => RadioDevice a -> IO ()
+doit backend = withRadioDevice backend $ do
 --  writeSamples backend 3
   -- grab all the internal states of the device for testing..
   let initwts = initialWriteTimestamp backend
@@ -71,5 +71,5 @@ doit backend = withRadioDevice backend 99999 $ do
 
 main :: IO ()
 main = do
-  doit =<< constructBladeRFDevice
-  doit =<< constructNullDevice
+  doit =<< constructBladeRFDevice 99999 -- 99999 is the desired sampleRate
+  doit =<< constructNullDevice 99999
