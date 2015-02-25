@@ -98,7 +98,7 @@ incClock (RadioClock clk sig) = RadioClock (incTN clk 1) sig
 
 -- | Interface to abstract the software Transceiver with the SDR hardware backend driver
 data RadioInterface = RadioInterface { receiveFIFO      :: VectorFIFO  -- ^ FIFO that holds receive bursts
---                                     , radio            :: RadioDevice -- ^ the SDR hw object XXX DO WE NEED THIS IN HASKELL????
+                                     , radio            :: RadioDevice -- ^ the SDR hw object XXX DO WE NEED THIS IN HASKELL????
                                      , clock            :: RadioClock  -- ^ the basestation clock
 
                                      , writeTimestamp   :: TimeStamp   -- ^ sample timestamp of next packet written to SDR hw

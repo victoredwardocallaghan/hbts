@@ -81,9 +81,6 @@ data RxDCOffsetParams = RxDCOffsetParams { mDCCorrect     :: Bool
                                          }
 
 data HwState = HwState { sampleRate        :: Double    -- ^ the desired sampling rate
-                       , rxTimestamp       :: TimeStamp -- ^ ..?? 
-                       , txTimestamp       :: TimeStamp -- ^ ..??
-                       , rxResyncCandidate :: TimeStamp -- ^ ..??
                        , underRun          :: Bool      -- ^ ..
                        , isSuperSpeed      :: Bool      -- ^ ..??
                        , rxDCOffsets       :: RxDCOffsetParams -- ^ Seriously think of a shorter name??????????????????????????????
@@ -92,7 +89,7 @@ data HwState = HwState { sampleRate        :: Double    -- ^ the desired samplin
 
 -- | Internal initial state-object constructor
 --runBladeRFDevice :: Double -> BladeRFDevice a -> IO a
---runBladeRFDevice sr m = evalStateT (unBladeRFDevice m) (HwState sr 1 1 0 False 0 False (RxDCOffsetParams True (gRxOffsetError * gRxAverageDamping) (maxRxDCOffset + 1) 0 0))
+--runBladeRFDevice sr m = evalStateT (unBladeRFDevice m) (HwState sr False False (RxDCOffsetParams True (gRxOffsetError * gRxAverageDamping) (maxRxDCOffset + 1) 0 0))
 
 -- initial states
 -- setRxOffsets(gConfig.getNum("TRX.RX.OffsetI"), gConfig.getNum("TRX.RX.OffsetQ"));
@@ -153,6 +150,9 @@ constructBladeRFDevice s = do
                             , readSamples           = bladeRFReadSamples
                             , writeSamples          = bladeRFWriteSamples
                             }
+
+  infoM loggerName "Creating bladeRF Device..."
+  -- sps = oversampling
   --
   --
   bladeRFOpen
@@ -163,7 +163,6 @@ constructBladeRFDevice s = do
 bladeRFReadSamples  = undefined
 bladeRFWriteSamples = undefined
 
-
 -- ..............................................
 -- XXXXXXXXXXX wacky types need to use (liftIO . void) everywhere to strip out the Either from the IO () action and then lift it..
 
@@ -171,11 +170,18 @@ bladeRFWriteSamples = undefined
 -- | ..
 bladeRFDeviceStart :: IO ()
 bladeRFDeviceStart = withBladeRF $ \dev -> do
+  --
+  rxTimestamp <- newIORef initialReadTimestamp
+  txTimestamp <- newIORef initialWriteTimestamp
+  rxResyncCandidate <- newIORef 0
+  txBuffered  <- newIORef 0
+  --
   speed <- bladeRFDeviceSpeed dev
   noticeM loggerName $ "starting bladeRF in  " ++ show speed ++ " speed mode..."
   bladeRFEnableModule dev MODULE_RX True
   bladeRFEnableModule dev MODULE_TX True
 
+-- | ..
 bladeRFDeviceStop :: IO ()
 bladeRFDeviceStop = withBladeRF $ \dev -> do
   noticeM loggerName "stopping bladeRF"
@@ -186,8 +192,6 @@ bladeRFDeviceStop = withBladeRF $ \dev -> do
 bladeRFOpen :: IO ()
 bladeRFOpen  = withBladeRF $ \dev -> do
   initLogger loggerName
-  infoM loggerName "Creating bladeRF Device..."
-  -- sps = oversampling
   --
   --
 
@@ -250,6 +254,9 @@ bladeRFOpen  = withBladeRF $ \dev -> do
   -- XXX this breaks this WHY???????????
 --  bladeRFSetTxGain bladeRFGetMinTxGain
 --  bladeRFSetRxGain bladeRFGetMinRxGain
+
+  -- samplesRead    <- newIORef 0
+  -- samplesWritten <- newIORef 0
 
 
 -- | return maximum Rx Gain
