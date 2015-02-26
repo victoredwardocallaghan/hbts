@@ -175,8 +175,8 @@ constructRadioInterface  = do
                           , tuneTx               = radioInterfaceTuneTx radioDeviceRef
                           , tuneRx               = radioInterfaceTuneRx radioDeviceRef
                           , setPowerAttenuation  = radioInterfaceSetPowerAttenuation radioDeviceRef
-                          , fullScaleInputValue  = radioInterfaceFullScaleInputValue radioDeviceRef
-                          , fullScaleOutputValue = radioInterfaceFullScaleOutputValue radioDeviceRef
+                          , fullScaleInputValue  = (readIORef radioDeviceRef) >>= radioDeviceFullScaleInputValue
+                          , fullScaleOutputValue = (readIORef radioDeviceRef) >>= radioDeviceFullScaleOutputValue
                           , attachRadio          = \r s -> modifyIORef radioDeviceRef (const r) -- ; modifyIORef radioOversamplingRef s
                           , getRadioDevice       = readIORef radioDeviceRef
                           }
@@ -184,18 +184,6 @@ constructRadioInterface  = do
 -- void setSamplesPerSymbol(int wSamplesPerSymbol) {if (!mOn) samplesPerSymbol = wSamplesPerSymbol;}
 -- int getSamplesPerSymbol() { return samplesPerSymbol;}
   return ri
-
--- | ..
-radioInterfaceFullScaleInputValue :: IORef RadioDevice -> IO Double
-radioInterfaceFullScaleInputValue r = do
-  radio <- readIORef r
-  radioDeviceFullScaleInputValue radio
-
--- | ..
-radioInterfaceFullScaleOutputValue :: IORef RadioDevice -> IO Double
-radioInterfaceFullScaleOutputValue r = do
-  radio <- readIORef r
-  radioDeviceFullScaleOutputValue radio
 
 -- | ??
 radioInterfaceSetPowerAttenuation :: IORef RadioDevice -> Double -> IO ()
