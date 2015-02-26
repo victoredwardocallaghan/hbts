@@ -32,8 +32,10 @@ import Bindings.LibBladeRF.Types
 
 --
 import BTS.RadioDevice
-
 import BTS.Logger
+
+loggerName :: String
+loggerName = "DeviceBladeRF.hs"
 
 -- | ..
 choiceFPGA :: BladeRFFPGASize -> String
@@ -44,11 +46,6 @@ choiceFPGA FPGA_115KLE  = "hostedx115.rbf"
 -- | ..
 getFPGAName :: DeviceHandle -> IO String
 getFPGAName dev = fmap choiceFPGA (bladeRFGetFPGASize dev)
-
-
-loggerName :: String
-loggerName = "DeviceBladeRF.hs"
-
 
 -- Stream defaults
 defaultStreamRXXFERS   =    1
@@ -87,18 +84,11 @@ data RxDCOffsetParams = RxDCOffsetParams { mDCCorrect     :: Bool
                                          }
 
 
-bracket start stop body = do
-     start
-     body
-     stop
-
----- | Object constructor
-withBladeRFDevice :: IORef Bool -> IO () -> IO ()
-withBladeRFDevice speed = bracket (bladeRFDeviceStart speed) bladeRFDeviceStop
-
 -- | Construct an instance of the RadioDevice interface type with BladeRFDevice
 constructBladeRFDevice :: Double -> IO RadioDevice
 constructBladeRFDevice s = do
+  initLogger loggerName
+
   --
   -- Read internal states
   rxGainRef            <- newIORef ((maxRxDCOffset + 1) :: Double)
@@ -123,7 +113,8 @@ constructBladeRFDevice s = do
 
   --
   --
-  let bladerfdev = RadioDevice { withRadioDevice       = withBladeRFDevice isSuperSpeed
+  let bladerfdev = RadioDevice { radioDeviceStart      = bladeRFDeviceStart isSuperSpeed  -- XXX should be be "open" instead?
+                               , radioDeviceStop       = bladeRFDeviceStop
                                , radioDeviceSetVCTCXO  = bladeRFSetVCTCXO . fromIntegral
 --                               , radioDeviceSetVCTCXO = \d -> liftIO $ (>>= either throwIO return) $ bladeRFSetVCTCXO (fromIntegral d)
                                , radioDeviceSetTxFreq             = \x y -> bladeRFSetTxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
@@ -199,15 +190,11 @@ bladeRFDeviceStop = withBladeRF $ \dev -> do
 
 bladeRFOpen :: IORef Bool -> IORef Integer -> IORef Integer -> IORef RxDCOffsetParams -> IORef Double ->  IO ()
 bladeRFOpen speedref samplesRRef samplesWRef rxdcoffset rxgainref = withBladeRF $ \dev -> do
-  initLogger loggerName
-  --
-  --
-
   libVersion <- bladeRFLibVersion
-  infoM loggerName (" libbladeRF version: " ++ show libVersion)
+  infoM loggerName $ "libbladeRF version: " ++ show libVersion
   serial <- bladeRFGetSerial dev
   fwVersion <- bladeRFFwVersion dev
-  infoM loggerName $ " Opened bladeRF Serial= " ++ show serial ++ " firmware version " ++ show fwVersion
+  infoM loggerName $ "Opened bladeRF Serial= " ++ show serial ++ " firmware version " ++ show fwVersion
 
 --  fpgaName <- return (choiceFPGA bladeRFGetFPGASize)
 
@@ -215,7 +202,7 @@ bladeRFOpen speedref samplesRRef samplesWRef rxdcoffset rxgainref = withBladeRF 
   fpgaName <- getFPGAName dev
 
   fpgaVersion <- bladeRFFPGAVersion dev
-  noticeM loggerName $ " bladeRF FPGA  " ++ show fpgaName ++ " is loaded with version " ++ show fpgaVersion
+  noticeM loggerName $ "bladeRF FPGA  " ++ show fpgaName ++ " is loaded with version " ++ show fpgaVersion
 
   --
   -- Figure out if we are using USB2 or USB3

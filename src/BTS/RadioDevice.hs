@@ -17,7 +17,8 @@ import qualified Data.ByteString as BS
 
 type TimeStamp = Integer -- ^ 64-bit virtual timestamp for radio data
 
-data RadioDevice = RadioDevice { withRadioDevice        :: IO () -> IO ()            -- ^ bracket pattern wrapper
+data RadioDevice = RadioDevice { radioDeviceStart       :: IO ()
+                               , radioDeviceStop        :: IO ()
                                , radioDeviceSetVCTCXO   :: Int -> IO ()              -- ^ Set the VCTCXO input voltage
                                , radioDeviceSetTxFreq   :: Double -> Double -> IO () -- ^ Set the transmitter frequency
                                , radioDeviceSetRxFreq   :: Double -> Double -> IO () -- ^ Set the receiver frequency

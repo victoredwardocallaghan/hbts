@@ -15,7 +15,7 @@ import Control.Monad.IO.Class
 
 doit ri = do
   backend <- getRadioDevice ri
-  withRadioDevice backend $ do
+  withRadio ri $ do
     liftIO $ putStrLn "=========== NullDevice ==========="
     -- grab all the internal states of the device for testing..
     let initwts = radioDeviceInitialWriteTimestamp backend
@@ -35,11 +35,11 @@ doit ri = do
     liftIO $ putStrLn $ "getSampleRate " ++ (show sr     )
   --
   --
+  liftIO $ putStrLn "========== BladeRFDevice ==========="
   brf <- constructBladeRFDevice 99999 -- 99999 is the desired sampleRate
   attachRadio ri brf 111111
   backend <- getRadioDevice ri
-  withRadioDevice backend $ do
-    liftIO $ putStrLn "========== BladeRFDevice ==========="
+  withRadio ri $ do
     -- grab all the internal states of the device for testing..
     let initwts = radioDeviceInitialWriteTimestamp backend
     let initrts = radioDeviceInitialReadTimestamp backend

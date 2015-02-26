@@ -19,13 +19,13 @@ import BTS.RadioDevice.NullDevice
 
 import BTS.Logger
 
-loggerName :: String
-loggerName  = "RadioInterface.hs"
+radioDeviceLogger :: String
+radioDeviceLogger  = "RadioInterface.hs"
 
 -- | samples per GSM symbol
--- SAMPSPERSYM = 1
-inChunk     = 625
-outChunk    = 625
+samplesPerSymbol = 1
+inChunk          = 625
+outChunk         = 625
 
 -- | Organised GSM bursts by GSM timestamps
 data RadioVector = RadioVector { time  :: Time -- ^ the burst's GSM timestamp
@@ -110,8 +110,9 @@ incClock (RadioClock clk sig) = RadioClock (incTN clk 1) sig
 
 
 -- | Interface to abstract the software Transceiver with the SDR hardware backend driver
-data RadioInterface = RadioInterface { setSamplesPerSymbol  :: Int -> IO ()
-                                     , getSamplesPerSymbol  :: Int
+data RadioInterface = RadioInterface { withRadio            :: IO () -> IO ()            -- ^ start/stop RadioInterface wrapper
+                                     , setSamplesPerSymbol  :: Int -> IO ()
+                                     , getSamplesPerSymbol  :: IO Int
                                      , isUnderrun           :: Bool                      -- ^ check for underrun, resets underrun value
                                      , setRxGain            :: Double -> IO ()           -- ^ set receive gain
                                      , setVCTCXO            :: Int -> IO ()              -- ^ tune VCTCXO
@@ -155,35 +156,69 @@ data RadioInterface = RadioInterface { setSamplesPerSymbol  :: Int -> IO ()
 --
 --		  loadTest = wLoadTest;
 
+bracket start stop body = do
+  start
+  body
+  stop
+
+withRadioInterface rdevref ronref = bracket (radioInterfaceStart rdevref ronref) (radioInterfaceStop ronref)
+
 -- | constructor
 constructRadioInterface :: IO RadioInterface
 constructRadioInterface  = do
+--  initLogger radioDeviceLogger
   --
---		 int wRadioOversampling = SAMPSPERSYM,
---		 int wTransceiverOversampling = SAMPSPERSYM,
+  samplesPerSymbolRef <- newIORef (samplesPerSymbol :: Int) -- samples per GSM symbol
   radioOnRef   <- newIORef False
   numARFCNRef  <- newIORef 1     -- XXX make into a Maybe argument with a default value of Just 1
   --
-  nulldev <- constructNullDevice 0 -- start with stub radio hw and attach hw later once found!
-  radioDeviceRef <- newIORef nulldev
+  -- Start with stub radio hw and attach hw later once found!
+  radioDeviceRef <- constructNullDevice 0 >>= newIORef
 
-  let ri = RadioInterface { setSamplesPerSymbol  = undefined
-                          , getSamplesPerSymbol  = undefined
+  let ri = RadioInterface { withRadio            = withRadioInterface radioDeviceRef radioOnRef
+                          , setSamplesPerSymbol  = modifyIORef samplesPerSymbolRef . const
+                          , getSamplesPerSymbol  = readIORef samplesPerSymbolRef
                           , isUnderrun           = undefined -- do flowstate <- readIORef bufferFlowRef ; modifyIORef bufferFlowRef False ; return flowstate
                           , setRxGain            = radioInterfaceSetRxGain radioDeviceRef
                           , setVCTCXO            = radioInterfaceSetVCTCXO radioDeviceRef
                           , tuneTx               = radioInterfaceTuneTx radioDeviceRef
                           , tuneRx               = radioInterfaceTuneRx radioDeviceRef
                           , setPowerAttenuation  = radioInterfaceSetPowerAttenuation radioDeviceRef
-                          , fullScaleInputValue  = (readIORef radioDeviceRef) >>= radioDeviceFullScaleInputValue
-                          , fullScaleOutputValue = (readIORef radioDeviceRef) >>= radioDeviceFullScaleOutputValue
-                          , attachRadio          = \r s -> modifyIORef radioDeviceRef (const r) -- ; modifyIORef radioOversamplingRef s
+                          , fullScaleInputValue  = readIORef radioDeviceRef >>= radioDeviceFullScaleInputValue
+                          , fullScaleOutputValue = readIORef radioDeviceRef >>= radioDeviceFullScaleOutputValue
+                          , attachRadio          = radioInterfaceAttachRadio radioDeviceRef radioOnRef
                           , getRadioDevice       = readIORef radioDeviceRef
                           }
 
 -- void setSamplesPerSymbol(int wSamplesPerSymbol) {if (!mOn) samplesPerSymbol = wSamplesPerSymbol;}
 -- int getSamplesPerSymbol() { return samplesPerSymbol;}
   return ri
+
+-- | start the RadioInterface
+radioInterfaceStart :: IORef RadioDevice -> IORef Bool -> IO ()
+radioInterfaceStart r p = do
+  radio <- readIORef r
+  infoM radioDeviceLogger "Starting the radio interface...."
+--  writeTimestamp = $ radioDeviceInitialWriteTimestamp radio
+--  readTimestamp  = $ radioDeviceInitialReadTimestamp radio
+  radioDeviceStart radio
+  debugM radioDeviceLogger "Radio started"
+--  radioDeviceUpdateAlignment radio (writeTimestamp - 10000)
+  modifyIORef p (const True)
+
+-- | stop  the RadioInterface
+radioInterfaceStop :: IORef Bool -> IO ()
+radioInterfaceStop p = do
+  debugM radioDeviceLogger "Radio stopped"
+  modifyIORef p (const False)
+
+-- | Modify in-use backend RadioDevice
+radioInterfaceAttachRadio :: IORef RadioDevice -> IORef Bool -> RadioDevice -> Int -> IO ()
+radioInterfaceAttachRadio radiodevref p r s = do
+  radioInterfaceStop p
+  modifyIORef radiodevref (const r)
+--  modifyIORef radioOversamplingRef s
+  radioInterfaceStart radiodevref p
 
 -- | ??
 radioInterfaceSetPowerAttenuation :: IORef RadioDevice -> Double -> IO ()
@@ -193,8 +228,8 @@ radioInterfaceSetPowerAttenuation r a = do
   let dBAtten = a -- + hwdBAtten --   dBAtten -= (-HWdBAtten);
   let linearAtten = 10 ** (0.1 * dBAtten)
   let powerScaling | linearAtten < 1.0 = 1
-                   | otherwise         = 1 / (sqrt linearAtten)
-  infoM loggerName $ "setting HW gain to " ++ show hwdBAtten ++ " and power scaling to " ++ show powerScaling
+                   | otherwise         = 1 / sqrt linearAtten
+  infoM radioDeviceLogger $ "setting HW gain to " ++ show hwdBAtten ++ " and power scaling to " ++ show powerScaling
 
 -- | ..
 radioInterfaceSetRxGain :: IORef RadioDevice -> Double -> IO ()
@@ -233,7 +268,6 @@ radioInterfaceTuneRx r f a = do
 -- , readTimestamp    :: TimeStamp   -- ^ sample timestamp of next packet read from SDR hw
 -- , numARFCNs        :: Int
 --
--- , samplesPerSymbol :: Int         -- ^ samples per GSM symbol
 -- , receiveOffset    :: Int         -- ^ offset b/w transmit and receive GSM timestamps, in timeslots
 -- , radioOn          :: Bool        -- ^ indicates radio is on
 --

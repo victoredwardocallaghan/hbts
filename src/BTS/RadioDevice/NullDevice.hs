@@ -15,7 +15,10 @@ import Data.Time.Clock
 import Data.IORef
 
 import BTS.RadioDevice
+import BTS.Logger
 
+loggerName :: String
+loggerName  = "NullDevice.hs"
 
 --data HwState = HwState { sampleRate     :: Double    -- ^ the desired sampling rate
 --                       , currentStamp   :: TimeStamp -- ^ internal timestamp clock state
@@ -34,21 +37,12 @@ import BTS.RadioDevice
 -- | Internal initial state-object constructor
 --runNullDevice sr m = getCurrentTime >>= \curTime -> evalStateT (unNullDevice m) (HwState sr 0 curTime False)
 
-bracket start stop body = do
-     start
-     body
-     stop
-
--- | Object constructor
-withNullDevice :: IO () -> IO ()
-withNullDevice stuff = do
-  putStrLn "INFO creating SDR device..."
-  bracket nullDeviceStart nullDeviceStop stuff
-
 
 -- | Construct an instance of the RadioDevice interface type with NullDevice
 constructNullDevice :: Double -> IO RadioDevice
 constructNullDevice s = do
+--  initLogger loggerName
+
   --
   -- Return internal status values
   sampleRateRef     <- newIORef s -- XXX !!! should be a param
@@ -57,7 +51,8 @@ constructNullDevice s = do
   startTimeRef      <- getCurrentTime >>= newIORef
   --
   --
-  let nulldev = RadioDevice { withRadioDevice                  = withNullDevice
+  let nulldev = RadioDevice { radioDeviceStart                 = nullDeviceStart
+                            , radioDeviceStop                  = nullDeviceStop
                             , radioDeviceSetVCTCXO             = undefined
                             , radioDeviceSetTxFreq             = nullDeviceSetTxFreq
                             , radioDeviceSetRxFreq             = nullDeviceSetRxFreq
@@ -102,11 +97,11 @@ constructNullDevice s = do
 
 -- | Start the SDR
 nullDeviceStart :: IO ()
-nullDeviceStart  = putStrLn $ "INFO " ++ "starting SDR..."
+nullDeviceStart  = infoM loggerName "starting SDR..."
 
 -- | Stop the SDR
 nullDeviceStop :: IO ()
-nullDeviceStop  = putStrLn $ "INFO " ++ "stopping SDR..."
+nullDeviceStop  = infoM loggerName "stopping SDR..."
 
 -- | ..
 --nullDeviceWriteSamples :: TimeStamp -> NullDevice ()
