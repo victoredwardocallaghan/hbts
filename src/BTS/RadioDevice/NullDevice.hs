@@ -57,36 +57,36 @@ constructNullDevice s = do
   startTimeRef      <- getCurrentTime >>= newIORef
   --
   --
-  let nulldev = RadioDevice { withRadioDevice       = withNullDevice
-                            , setVCTCXO             = undefined
-                            , setTxFreq             = nullDeviceSetTxFreq
-                            , setRxFreq             = nullDeviceSetRxFreq
+  let nulldev = RadioDevice { withRadioDevice                  = withNullDevice
+                            , radioDeviceSetVCTCXO             = undefined
+                            , radioDeviceSetTxFreq             = nullDeviceSetTxFreq
+                            , radioDeviceSetRxFreq             = nullDeviceSetRxFreq
                             -- ..
-                            , setRxGain             = undefined
-                            , setTxGain             = undefined
-                            , getRxGain             = return 0.0
+                            , radioDeviceSetRxGain             = undefined
+                            , radioDeviceSetTxGain             = undefined
+                            , radioDeviceGetRxGain             = return 0.0
                             -- ..
-                            , getMaxRxGain          = 0.0
-                            , getMinRxGain          = 0.0
-                            , getMaxTxGain          = 0.0
-                            , getMinTxGain          = 0.0
+                            , radioDeviceGetMaxRxGain          = 0.0
+                            , radioDeviceGetMinRxGain          = 0.0
+                            , radioDeviceGetMaxTxGain          = 0.0
+                            , radioDeviceGetMinTxGain          = 0.0
                             -- ..
-                            , getTxFreq             = 0
-                            , getRxFreq             = 0
-                            , getSampleRate         = readIORef sampleRateRef
-                            , numberRead            = readIORef samplesReadRef
-                            , numberWritten         = readIORef samplesWrittenRef
+                            , radioDeviceGetTxFreq             = 0
+                            , radioDeviceGetRxFreq             = 0
+                            , radioDeviceGetSampleRate         = readIORef sampleRateRef
+                            , radioDeviceNumberRead            = readIORef samplesReadRef
+                            , radioDeviceNumberWritten         = readIORef samplesWrittenRef
                             -- ..
-                            , updateAlignment       = nullDeviceUpdateAlignment
+                            , radioDeviceUpdateAlignment       = nullDeviceUpdateAlignment
                             -- ..
-                            , initialWriteTimestamp = 20000 -- Returns the starting write Timestamp
-                            , initialReadTimestamp  = 20000 -- Returns the starting read Timestamp
+                            , radioDeviceInitialWriteTimestamp = 20000 -- Returns the starting write Timestamp
+                            , radioDeviceInitialReadTimestamp  = 20000 -- Returns the starting read Timestamp
                             -- ..
-                            , fullScaleInputValue   = 13500.0 -- returns the full-scale transmit amplitude
-                            , fullScaleOutputValue  = 9450.0  -- returns the full-scale receive amplitude
+                            , radioDeviceFullScaleInputValue   = return 13500.0 -- returns the full-scale transmit amplitude
+                            , radioDeviceFullScaleOutputValue  = return 9450.0  -- returns the full-scale receive amplitude
                             -- ..
-                            , readSamples           = \_ -> return ()
-                            , writeSamples          = \_ -> return ()
+                            , radioDeviceReadSamples           = undefined -- \_ -> return ()
+                            , radioDeviceWriteSamples          = undefined -- \_ -> return ()
                             }
 
 

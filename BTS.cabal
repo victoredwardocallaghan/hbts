@@ -48,7 +48,7 @@ library
                        BTS.RadioDevice.BladeRFDevice
   other-modules:       GitRev,
                        Paths_BTS
-  build-depends:       base, ansi-terminal, pretty, time, transformers, mtl, hlibBladeRF, hslogger
+  build-depends:       base, ansi-terminal, pretty, time, transformers, mtl, hlibBladeRF, hslogger, bytestring
   hs-source-dirs:      src
   default-language:    Haskell2010
 

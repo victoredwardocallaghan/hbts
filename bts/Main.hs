@@ -1,6 +1,7 @@
 module Main where
 
 import BTS.RadioDevice
+import BTS.RadioInterface
 import BTS.RadioDevice.NullDevice
 import BTS.RadioDevice.BladeRFDevice
 
@@ -12,64 +13,50 @@ import Control.Monad.IO.Class
 --   My little pony (a boring test program in reality..)
 -- ------------------------------------------------------ --
 
---doit :: (MonadIO a) => RadioDevice a -> IO ()
-doit backend = withRadioDevice backend $ do
---  writeSamples backend 3
-  -- grab all the internal states of the device for testing..
-  let initwts = initialWriteTimestamp backend
-  let initrts = initialReadTimestamp backend
-  let fsiv    = fullScaleInputValue backend
-  let fsov    = fullScaleOutputValue backend
-  let txfreq  = getTxFreq backend
-  let rxfreq  = getRxFreq backend
-  sr      <- getSampleRate backend
---  nor     <- numberRead backend
---  now     <- numberWritten backend
-  -- ok now print them..
-  liftIO $ putStrLn $ "initialWriteTimestamp " ++ (show initwts)
-  liftIO $ putStrLn $ "initialReadTimestamp " ++ (show initrts)
-  liftIO $ putStrLn $ "fullScaleInputValue " ++ (show fsiv   )
-  liftIO $ putStrLn $ "fullScaleOutputValue " ++ (show fsov   )
-  liftIO $ putStrLn $ "getTxFreq " ++ (show txfreq )
-  liftIO $ putStrLn $ "getRxFreq " ++ (show rxfreq )
-  liftIO $ putStrLn $ "getSampleRate " ++ (show sr     )
---  liftIO $ putStrLn $ "numberRead " ++ (show nor    )
---  liftIO $ putStrLn $ "numberWritten " ++ (show now    )
-  -- try some other shit
---  cts <- NullDevice $ gets currentStamp
---  liftIO $ putStrLn $ "cts = " ++ (show cts)
---  writeSamples backend 3
---  writeSamples backend 3
---  writeSamples backend 3
---  writeSamples backend 3
---  writeSamples backend 3
---  cts <- NullDevice $ gets currentStamp
---  liftIO $ putStrLn $ "cts = " ++ (show cts)
+doit ri = do
+  backend <- getRadioDevice ri
+  withRadioDevice backend $ do
+    liftIO $ putStrLn "=========== NullDevice ==========="
+    -- grab all the internal states of the device for testing..
+    let initwts = radioDeviceInitialWriteTimestamp backend
+    let initrts = radioDeviceInitialReadTimestamp backend
+    fsiv       <- fullScaleInputValue ri
+    fsov       <- fullScaleOutputValue ri
+    let txfreq  = radioDeviceGetTxFreq backend
+    let rxfreq  = radioDeviceGetRxFreq backend
+    sr         <- radioDeviceGetSampleRate backend
+    -- ok now print them..
+    liftIO $ putStrLn $ "initialWriteTimestamp " ++ (show initwts)
+    liftIO $ putStrLn $ "initialReadTimestamp " ++ (show initrts)
+    liftIO $ putStrLn $ "fullScaleInputValue " ++ (show fsiv   )
+    liftIO $ putStrLn $ "fullScaleOutputValue " ++ (show fsov   )
+    liftIO $ putStrLn $ "getTxFreq " ++ (show txfreq )
+    liftIO $ putStrLn $ "getRxFreq " ++ (show rxfreq )
+    liftIO $ putStrLn $ "getSampleRate " ++ (show sr     )
   --
-  liftIO $ putStrLn "=============================================="
-  -- grab all the internal states of the device for testing..
-  let initwts = initialWriteTimestamp backend
-  let initrts = initialReadTimestamp backend
-  let fsiv    = fullScaleInputValue backend
-  let fsov    = fullScaleOutputValue backend
-  let txfreq  = getTxFreq backend
-  let rxfreq  = getRxFreq backend
-  sr      <- getSampleRate backend
---  nor     <- numberRead backend
---  now     <- numberWritten backend
-  -- ok now print them..
-  liftIO $ putStrLn $ "initialWriteTimestamp " ++ (show initwts)
-  liftIO $ putStrLn $ "initialReadTimestamp " ++ (show initrts)
-  liftIO $ putStrLn $ "fullScaleInputValue " ++ (show fsiv   )
-  liftIO $ putStrLn $ "fullScaleOutputValue " ++ (show fsov   )
-  liftIO $ putStrLn $ "getTxFreq " ++ (show txfreq )
-  liftIO $ putStrLn $ "getRxFreq " ++ (show rxfreq )
-  liftIO $ putStrLn $ "getSampleRate " ++ (show sr     )
---  liftIO $ putStrLn $ "numberRead " ++ (show nor    )
---  liftIO $ putStrLn $ "numberWritten " ++ (show now    )
-
+  --
+  brf <- constructBladeRFDevice 99999 -- 99999 is the desired sampleRate
+  attachRadio ri brf 111111
+  backend <- getRadioDevice ri
+  withRadioDevice backend $ do
+    liftIO $ putStrLn "========== BladeRFDevice ==========="
+    -- grab all the internal states of the device for testing..
+    let initwts = radioDeviceInitialWriteTimestamp backend
+    let initrts = radioDeviceInitialReadTimestamp backend
+    fsiv       <- fullScaleInputValue ri
+    fsov       <- fullScaleOutputValue ri
+    let txfreq  = radioDeviceGetTxFreq backend
+    let rxfreq  = radioDeviceGetRxFreq backend
+    sr         <- radioDeviceGetSampleRate backend
+    -- ok now print them..
+    liftIO $ putStrLn $ "initialWriteTimestamp " ++ (show initwts)
+    liftIO $ putStrLn $ "initialReadTimestamp " ++ (show initrts)
+    liftIO $ putStrLn $ "fullScaleInputValue " ++ (show fsiv   )
+    liftIO $ putStrLn $ "fullScaleOutputValue " ++ (show fsov   )
+    liftIO $ putStrLn $ "getTxFreq " ++ (show txfreq )
+    liftIO $ putStrLn $ "getRxFreq " ++ (show rxfreq )
+    liftIO $ putStrLn $ "getSampleRate " ++ (show sr     )
 
 main :: IO ()
 main = do
-  doit =<< constructBladeRFDevice 99999 -- 99999 is the desired sampleRate
-  doit =<< constructNullDevice 99999
+  doit =<< constructRadioInterface
