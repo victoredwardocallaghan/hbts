@@ -13,7 +13,7 @@ module BTS.RadioDevice.BladeRFDevice where
 
 import Foreign hiding (void)
 
--- import Control.Exception
+import Control.Exception (throwIO)
 
 import Data.IORef
 import Control.Monad (unless)
@@ -26,9 +26,6 @@ import LibBladeRF.Gain
 import LibBladeRF.Frequency
 import LibBladeRF.Utils
 import LibBladeRF.Types
-
---
-import Bindings.LibBladeRF.Types
 
 --
 import BTS.RadioDevice
@@ -179,6 +176,7 @@ bladeRFDeviceStart speedref = withBladeRF $ \dev -> do
 
   bladeRFEnableModule dev MODULE_RX True
   bladeRFEnableModule dev MODULE_TX True
+  return () -- XXX
 
 -- | ..
 bladeRFDeviceStop :: IO ()
@@ -186,6 +184,7 @@ bladeRFDeviceStop = withBladeRF $ \dev -> do
   noticeM loggerName "stopping bladeRF"
   bladeRFEnableModule dev MODULE_RX False
   bladeRFEnableModule dev MODULE_TX False
+  return () -- XXX
 
 
 bladeRFOpen :: IORef Bool -> IORef Integer -> IORef Integer -> IORef RxDCOffsetParams -> IORef Double ->  IO ()
@@ -239,24 +238,35 @@ bladeRFOpen speedref samplesRRef samplesWRef rxdcoffset rxgainref = withBladeRF 
   --
   -- Set Sync Configuration
   --
-  bladeRFSyncConfig dev MODULE_RX FORMAT_SC16_Q11 defaultStreamRXBuffers defaultStreamSamples defaultStreamRXXFERS defaultStreamTimeout
-  bladeRFSyncConfig dev MODULE_TX FORMAT_SC16_Q11 defaultStreamRXBuffers defaultStreamSamples defaultStreamTXXFERS defaultStreamTimeout
+  _ <- bladeRFSyncConfig dev MODULE_RX FORMAT_SC16_Q11 defaultStreamRXBuffers defaultStreamSamples defaultStreamRXXFERS defaultStreamTimeout
+  _ <- bladeRFSyncConfig dev MODULE_TX FORMAT_SC16_Q11 defaultStreamRXBuffers defaultStreamSamples defaultStreamTXXFERS defaultStreamTimeout
 
   --
   -- Setup GPIO's for timestamping
   --
   gpios <- bladeRFConfigGPIORead dev
-  bladeRFConfigGPIOWrite dev $ gpios .|. c'BLADERF_GPIO_TIMESTAMP
+  case gpios of
+    Left e -> throwIO e
+    Right gpios -> do
+      putStrLn "========= GPIO Dump ========="
+      mapM_ putStrLn $ debugBladeRFGPIOFlags gpios
+      bladeRFConfigGPIOWrite dev $ GPIO_TIMESTAMP : gpios
+
   gpios <- bladeRFConfigGPIORead dev
-  if (gpios .&. c'BLADERF_GPIO_TIMESTAMP) == c'BLADERF_GPIO_TIMESTAMP
-   then noticeM loggerName "bladeRF timestamping enabled."
-   else alertM loggerName "Could not enable timestamping."
+  case gpios of
+    Left e -> throwIO e
+    Right gpios -> do
+      putStrLn "========= GPIO Dump ========="
+      mapM_ putStrLn $ debugBladeRFGPIOFlags gpios
+      if elem GPIO_TIMESTAMP gpios
+       then noticeM loggerName "bladeRF timestamping enabled."
+       else alertM loggerName "Could not enable timestamping."
 
   --
   -- Set initial gains to minimum, the transceiver will adjust them later
   --
-  bladeRFSetTxGain' dev bladeRFGetMinTxGain
-  bladeRFSetRxGain' dev bladeRFGetMinRxGain rxdcoffset rxgainref
+  _ <- bladeRFSetTxGain' dev bladeRFGetMinTxGain
+  _ <- bladeRFSetRxGain' dev bladeRFGetMinRxGain rxdcoffset rxgainref
 
   modifyIORef samplesRRef (const 0)
   modifyIORef samplesWRef (const 0)
@@ -284,7 +294,7 @@ bladeRFSetTxGain g = withBladeRF $ \dev -> bladeRFSetTxGain' dev g
 
 bladeRFSetTxGain' :: DeviceHandle -> Int -> IO ()
 bladeRFSetTxGain' dev g = do
-  bladeRFSetTXVGA1 dev TXVGA1_GAIN_MAX
+  _ <- bladeRFSetTXVGA1 dev TXVGA1_GAIN_MAX
   --
   if g > bladeRFGetMaxTxGain then
    do let g = bladeRFGetMaxTxGain
@@ -309,8 +319,8 @@ bladeRFSetRxGain' dev g rxoffsetref rxgainref = do
   let newRxMaxOffset = (realToFrac g * gRxOffsetCoef + realToFrac gRxOffsetError) * realToFrac gRxAverageDamping
   modifyIORef rxoffsetref (\x -> x { mRxMaxOffset = newRxMaxOffset })
   rxoffsets <- readIORef rxoffsetref
-  bladeRFSetRXVGA1 dev $ mRxGain1 rxoffsets
-  bladeRFSetRXVGA2 dev (toEnum g)
+  _ <- bladeRFSetRXVGA1 dev $ mRxGain1 rxoffsets
+  _ <- bladeRFSetRXVGA2 dev (toEnum g)
   infoM loggerName $ "RX gain set to " ++ show g ++ " dB."
   modifyIORef rxgainref (const (fromIntegral g))
 
@@ -320,6 +330,7 @@ bladeRFSetVCTCXO :: Word16 -> IO ()
 bladeRFSetVCTCXO d = withBladeRF $ \dev -> do
   infoM loggerName $ "set VCTCXO: " ++ show d
   bladeRFDACWrite dev $ shiftL d 8
+  return () -- XXX
 
 --
 -- | Set the transmitter frequency
@@ -328,6 +339,7 @@ bladeRFSetTxFreq f d = withBladeRF $ \dev -> do
   infoM loggerName $ "set Tx freq: " ++ show f ++ " correction: " ++ show d
   bladeRFSetFrequency dev MODULE_TX f
   bladeRFSetVCTCXO d
+  return () -- XXX
 
 --
 -- | Set the receiver frequency
@@ -336,6 +348,7 @@ bladeRFSetRxFreq f d = withBladeRF $ \dev -> do
   infoM loggerName $ "set Rx freq: " ++ show f ++ " correction: " ++ show d
   bladeRFSetFrequency dev MODULE_RX f
   bladeRFSetVCTCXO d
+  return () -- XXX
 
 -- XXX (internal function)
 -- | Set the TX DAC correction offsets
@@ -344,6 +357,7 @@ bladeRFSetTxOffsets corrI corrQ = withBladeRF $ \dev -> do
 --    if ((abs(corrI) > MAX_TX_DC_OFFSET) || (abs(corrQ) > MAX_TX_DC_OFFSET)) return false;
   bladeRFSetCorrection dev MODULE_TX CORR_LMS_DCOFF_I (shiftL shiftTxDC corrI)
   bladeRFSetCorrection dev MODULE_TX CORR_LMS_DCOFF_Q (shiftL shiftTxDC corrQ)
+  return () -- XXX
 
 -- XXX (internal function)
 -- | Set the RX DAC correction offsets
@@ -357,3 +371,4 @@ bladeRFSetRxOffsets corrI corrQ rxoffsetref = withBladeRF $ \dev -> do
     modifyIORef rxoffsetref (\x -> x { mRxCorrectionQ = fromIntegral corrQ })
     bladeRFSetCorrection dev MODULE_RX CORR_LMS_DCOFF_I (shiftL shiftRxDC corrI)
     bladeRFSetCorrection dev MODULE_RX CORR_LMS_DCOFF_Q (shiftL shiftRxDC corrQ)
+    return () -- XXX
