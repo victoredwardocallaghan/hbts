@@ -238,11 +238,12 @@ radioInterfaceTuneRx r f a = do
 --     +----|----+
 --          v
 --          r
-radioInterfaceSink :: RadioDevice -> Consumer (BS.ByteString, TimeStamp) IO ()
+-- radioInterfaceSink :: RadioDevice -> Consumer (BS.ByteString, TimeStamp) IO ()
+radioInterfaceSink :: RadioDevice -> Consumer BS.ByteString IO ()
 radioInterfaceSink radio = do
-  lift $ putStrLn "WOOOOT"
-  (bs, ts) <- await
-  lift $ putStrLn $ "we got this to write..." ++ show bs
+--  (bs, ts) <- await
+  bs <- await
+  let ts = 0
   x <- lift $ try $ do
     debugM loggerName $ "write timestamp: " ++ show ts
     radioDeviceWriteSamples radio bs 0 ts False
@@ -267,11 +268,12 @@ radioInterfaceSink radio = do
 --     +----|----+
 --          v
 --          r
+-- XXX                       FIXME vvv  forever is a bit too long, Rx buffer will timeout
 radioInterfaceSource :: RadioDevice -> TimeStamp -> Producer BS.ByteString IO ()
 radioInterfaceSource radio ts = forever $ do
-    lift $ debugM loggerName $ "read timestamp: " ++ show ts
-    (bs, _) <- lift $ radioDeviceReadSamples radio 0 ts
-    yield bs
+  lift $ debugM loggerName $ "read timestamp: " ++ show ts
+  (bs, _) <- lift $ radioDeviceReadSamples radio 1000 ts -- 1000 is the sample length
+  yield bs
 
 --  XXX internal state of the RadioInterface
 --

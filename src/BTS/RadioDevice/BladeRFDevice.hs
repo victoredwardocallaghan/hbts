@@ -47,12 +47,20 @@ getFPGAName :: DeviceHandle -> IO String
 getFPGAName dev = fmap choiceFPGA (bladeRFGetFPGASize dev)
 
 -- Stream defaults
-defaultStreamRXXFERS   =    1
-defaultStreamRXBuffers =    8
-defaultStreamTXXFERS   =    1
-defaultStreamTXBuffers =    8
-defaultStreamSamples   = 2048
-defaultStreamTimeout   =  500
+--defaultStreamRXXFERS   =  1
+--defaultStreamRXBuffers =  8
+--defaultStreamTXXFERS   =  1
+--defaultStreamTXBuffers =  8
+--defaultStreamSamples   =  2048
+--defaultStreamTimeout   =  500
+
+-- these seem to work better..
+defaultStreamRXXFERS   =  8
+defaultStreamRXBuffers =  16
+defaultStreamTXXFERS   =  8
+defaultStreamTXBuffers =  16
+defaultStreamSamples   =  1024
+defaultStreamTimeout   =  3500
 
 -- .
 shiftTxDC = 4
@@ -161,15 +169,12 @@ bladeRFReadSamples devRef n _ = do
   ret <- bladeRFSyncRx dev n defaultStreamTimeout
   case ret of
     Left e -> throwIO e
-    Right (rxSamples, _) -> do
-      return (rxSamples, 0)
---      syncRx dev
+    Right (rxSamples, _) -> return (rxSamples, 0)
 
 bladeRFWriteSamples :: IORef DeviceHandle -> BS.ByteString -> Int -> TimeStamp -> Bool -> IO ()
 bladeRFWriteSamples devRef bs _ _ _ = do
   dev <- readIORef devRef
   debugM loggerName $ "Tx sample length: " ++ " with timestamp: "
-  putStrLn $ "we got this to write..." ++ show bs
   ret <- bladeRFSyncTx dev bs Nothing defaultStreamTimeout
   case ret of
     Left e -> throwIO e
@@ -196,7 +201,7 @@ bladeRFDeviceStart devRef speedref = do
 
   -- XXXXXXXXX For testing... XXXXXXXXXX
   --
-  bladeRFLogSetVerbosity LOG_LEVEL_VERBOSE
+--  bladeRFLogSetVerbosity LOG_LEVEL_VERBOSE
   bladeRFSetLoopback dev LB_FIRMWARE
   --
   -- XXXXXXXXX For testing... XXXXXXXXXX

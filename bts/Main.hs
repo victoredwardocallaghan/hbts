@@ -12,17 +12,21 @@ import Control.Monad.IO.Class
 
 import Control.Concurrent.ParallelIO.Global
 
+import System.IO
+
 import Pipes
+import qualified Pipes.ByteString as P
 import qualified Data.ByteString as BS
 
 syncTx :: RadioDevice -> IO ()
-syncTx rd = runEffect $ do
-  input <- lift $ BS.readFile "testsig.bin"
-  (yield (input, 0)) >-> (radioInterfaceSink rd)
+syncTx rd = withFile "testsig.bin" ReadMode $ \hIn ->
+  runEffect $ P.fromHandle hIn >-> radioInterfaceSink rd
 
 syncRx :: RadioDevice -> IO ()
-syncRx rd = runEffect $ for (radioInterfaceSource rd 111) $ \stream -> do
-  lift $ BS.appendFile "out.bin" stream
+syncRx rd = withFile "out.bin" WriteMode $ \hOut -> do
+  runEffect $ (radioInterfaceSource rd 111) >-> P.toHandle hOut
+--  runEffect $ for (radioInterfaceSource rd 111) $ \stream -> do
+--    yield stream >-> P.toHandle hOut
 
 -- ------------------------------------------------------ --
 --   My little pony (a boring test program in reality..)
@@ -73,7 +77,8 @@ doit ri = do
     liftIO $ putStrLn $ "getSampleRate " ++ (show sr     )
 
     -- XXX
-    parallel_ [syncTx backend, syncRx backend] >> stopGlobalPool
+    parallel_ [syncRx backend, syncTx backend] >> stopGlobalPool
+
 
 main :: IO ()
 main = do
