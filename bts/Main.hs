@@ -5,9 +5,24 @@ import BTS.RadioInterface
 import BTS.RadioDevice.NullDevice
 import BTS.RadioDevice.BladeRFDevice
 
+import Control.Monad (forever)
 import Control.Monad.Trans
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
+
+import Control.Concurrent.ParallelIO.Global
+
+import Pipes
+import qualified Data.ByteString as BS
+
+syncTx :: RadioDevice -> IO ()
+syncTx rd = runEffect $ do
+  input <- lift $ BS.readFile "testsig.bin"
+  (yield (input, 0)) >-> (radioInterfaceSink rd)
+
+syncRx :: RadioDevice -> IO ()
+syncRx rd = runEffect $ for (radioInterfaceSource rd 111) $ \stream -> do
+  lift $ BS.appendFile "out.bin" stream
 
 -- ------------------------------------------------------ --
 --   My little pony (a boring test program in reality..)
@@ -56,6 +71,9 @@ doit ri = do
     liftIO $ putStrLn $ "getTxFreq " ++ (show txfreq )
     liftIO $ putStrLn $ "getRxFreq " ++ (show rxfreq )
     liftIO $ putStrLn $ "getSampleRate " ++ (show sr     )
+
+    -- XXX
+    parallel_ [syncTx backend, syncRx backend] >> stopGlobalPool
 
 main :: IO ()
 main = do

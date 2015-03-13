@@ -13,6 +13,14 @@ module BTS.RadioInterface where
 
 import Data.IORef
 
+import qualified Data.ByteString as BS
+
+import Pipes
+
+import Control.Monad (unless, forever)
+import Control.Exception (try, throwIO)
+import qualified GHC.IO.Exception as G
+
 import BTS.GSMCommon
 import BTS.RadioDevice
 import BTS.RadioDevice.NullDevice
@@ -73,22 +81,6 @@ getCurrentBurst :: Time              -- ^ The target time.
 getCurrentBurst t = undefined
 
 
--- | a FIFO of RadioVectors
-
--- XXX stub types
-data VectorFIFO = FOO
-
---
-fifoSize :: Int
-fifoSize  = undefined
---
-put :: RadioVector
-put  = undefined
---
-get :: RadioVector
-get  = undefined
-
-
 -- | The basestation clock
 data RadioClock = RadioClock { rclock :: Time
                              , signal :: Int  -- ^ XXX fix type?? pthread_cond_broadcast() properly dont need this at all??
@@ -123,38 +115,15 @@ data RadioInterface = RadioInterface { withRadio            :: IO () -> IO ()   
                                      , fullScaleOutputValue :: IO Double                 -- ^ returns the full-scale receive amplitude
                                      , attachRadio          :: RadioDevice -> Int -> IO() -- ^ attach an existing SDR to this interface
                                      , getRadioDevice       :: IO RadioDevice             -- ^ return the radio device
--- ^ return the receive FIFO
--- VectorFIFO* receiveFIFO() { return &mReceiveFIFO;}
 -- ^ return the basestation clock
 -- RadioClock* getClock(void) { return &mClock;};
 --getClock :: RadioClock
+
 -- ^ drive transmission of GSM bursts
 -- void driveTransmitRadio(signalVector &radioBurst, bool zeroBurst);
--- driveReceiveRadio :: () -- ^ drive reception of GSM bursts
+-- driveReceiveRadio :: IO () -- ^ drive reception of GSM bursts
                                      }
 
---  RadioInterface(RadioDevice* wRadio = NULL,
---		 int receiveOffset = 3,
---		 int wRadioOversampling = SAMPSPERSYM,
---		 int wTransceiverOversampling = SAMPSPERSYM,
---		 bool wLoadTest = false,
---		 unsigned int wNumARFCNS = 1,
---		 GSM::Time wStartTime = GSM::Time(0));
---
---		  underrun = false;
---		    
---		  sendCursor = 0; 
---		  rcvCursor = 0;
---		  mOn = false;
---		            
---		  mRadio = wRadio;
---		  receiveOffset = wReceiveOffset;
---		  samplesPerSymbol = wRadioOversampling;
---		  mClock.set(wStartTime);
---		  powerScaling = 1.0;
---		  mNumARFCNs = wNumARFCNs;
---
---		  loadTest = wLoadTest;
 
 bracket start stop body = do
   start
@@ -255,6 +224,54 @@ radioInterfaceTuneRx r f a = do
   radio <- readIORef r
   radioDeviceSetRxFreq radio f a
 
+-- | Sink GSM bursts into the transmit pipe line
+--
+-- type Consumer a = Proxy () a () X
+--
+-- Upstream | Downstream
+--     +---------+
+--     |         |
+-- () <==       <== ()
+--     |         |
+-- a  ==>       ==> X
+--     |    |    |
+--     +----|----+
+--          v
+--          r
+radioInterfaceSink :: RadioDevice -> Consumer (BS.ByteString, TimeStamp) IO ()
+radioInterfaceSink radio = do
+  lift $ putStrLn "WOOOOT"
+  (bs, ts) <- await
+  lift $ putStrLn $ "we got this to write..." ++ show bs
+  x <- lift $ try $ do
+    debugM loggerName $ "write timestamp: " ++ show ts
+    radioDeviceWriteSamples radio bs 0 ts False
+  case x of
+    -- Gracefully terminate if we got a broken pipe error
+    Left e@(G.IOError { G.ioe_type = t}) ->
+       lift $ unless (t == G.ResourceVanished) $ throwIO e
+    -- Otherwise loop
+    Right () -> radioInterfaceSink radio
+
+-- | Source GSM bursts from the receive pipe line
+--
+-- type Producer b = Proxy X () () b
+--
+-- Upstream | Downstream
+--     +---------+
+--     |         |
+-- X  <==       <== ()
+--     |         |
+-- () ==>       ==> b
+--     |    |    |
+--     +----|----+
+--          v
+--          r
+radioInterfaceSource :: RadioDevice -> TimeStamp -> Producer BS.ByteString IO ()
+radioInterfaceSource radio ts = forever $ do
+    lift $ debugM loggerName $ "read timestamp: " ++ show ts
+    (bs, _) <- lift $ radioDeviceReadSamples radio 0 ts
+    yield bs
 
 --  XXX internal state of the RadioInterface
 --
@@ -270,7 +287,4 @@ radioInterfaceTuneRx r f a = do
 --
 -- , receiveOffset    :: Int         -- ^ offset b/w transmit and receive GSM timestamps, in timeslots
 -- , radioOn          :: Bool        -- ^ indicates radio is on
---
--- , pushBuffer       :: IO ()       -- ^ push GSM bursts into the transmit buffer (XXX fix type??)
--- , popBuffer        :: IO ()       -- ^ pull GSM bursts from the receive buffer (XXX fix type??)
 -- }

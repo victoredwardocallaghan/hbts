@@ -48,12 +48,14 @@ data RadioDevice = RadioDevice { radioDeviceStart       :: IO ()
                                -- | Read/Write samples from the radio, returns the number of samples actually read/written.
                                , radioDeviceReadSamples  :: Int           -- ^ len number of samples desired to read.
                                                          -> TimeStamp     -- ^ The timestamp of the first samples to be read.
-                                                         -> IO (BS.ByteString, Int, SamplesIO) -- ^ (buffer contains read result, RSSI The received signal strength of the read result, SamplesIO state)
+                                                         -> IO (BS.ByteString, Int) -- ^ (buffer contains read result, RSSI The received signal strength of the read result, SamplesIO state)
+--                                                         -> IO (BS.ByteString, Int, SamplesIO) -- ^ (buffer contains read result, RSSI The received signal strength of the read result, SamplesIO state)
                                , radioDeviceWriteSamples :: BS.ByteString -- ^ buf Contains the data to be written.
                                                          -> Int           -- ^ len number of samples to write.
                                                          -> TimeStamp     -- ^ timestamp The timestamp of the first sample of the data buffer.
                                                          -> Bool          -- ^ isControl Set if data is a control packet, e.g. a ping command
-                                                         -> IO SamplesIO
+                                                         -> IO ()
+--                                                         -> IO SamplesIO
                                }
 
 -- | ..

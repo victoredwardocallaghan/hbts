@@ -16,7 +16,9 @@ import Foreign hiding (void)
 import Control.Exception (throwIO)
 
 import Data.IORef
-import Control.Monad (unless)
+import Control.Monad (unless, when)
+
+import qualified Data.ByteString as BS
 
 import LibBladeRF.LibBladeRF
 import LibBladeRF.Sampling
@@ -109,16 +111,19 @@ constructBladeRFDevice s = do
   rxDCOffsetRef <- newIORef rxDCOffsetParams
 
   --
+  -- XXX makes this into a record and pass that..
+  devRef <- bladeRFOpen isSuperSpeed samplesReadRef samplesWrittenRef rxDCOffsetRef rxGainRef
   --
-  let bladerfdev = RadioDevice { radioDeviceStart      = bladeRFDeviceStart isSuperSpeed  -- XXX should be be "open" instead?
-                               , radioDeviceStop       = bladeRFDeviceStop
-                               , radioDeviceSetVCTCXO  = bladeRFSetVCTCXO . fromIntegral
+  --
+  let bladerfdev = RadioDevice { radioDeviceStart      = bladeRFDeviceStart devRef isSuperSpeed  -- XXX should be be "open" instead?
+                               , radioDeviceStop       = bladeRFDeviceStop devRef
+                               , radioDeviceSetVCTCXO  = \vctcxo -> bladeRFSetVCTCXO devRef (fromIntegral vctcxo)
 --                               , radioDeviceSetVCTCXO = \d -> liftIO $ (>>= either throwIO return) $ bladeRFSetVCTCXO (fromIntegral d)
-                               , radioDeviceSetTxFreq             = \x y -> bladeRFSetTxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
-                               , radioDeviceSetRxFreq             = \x y -> bladeRFSetRxFreq ((fromIntegral . round) x) ((fromIntegral . round) y)
+                               , radioDeviceSetTxFreq             = \x y -> bladeRFSetTxFreq devRef ((fromIntegral . round) x) ((fromIntegral . round) y)
+                               , radioDeviceSetRxFreq             = \x y -> bladeRFSetRxFreq devRef ((fromIntegral . round) x) ((fromIntegral . round) y)
                                -- ..
-                               , radioDeviceSetRxGain             = \g -> bladeRFSetRxGain (round g) rxDCOffsetRef rxGainRef
-                               , radioDeviceSetTxGain             = bladeRFSetTxGain . round
+                               , radioDeviceSetRxGain             = \g -> bladeRFSetRxGain devRef (round g) rxDCOffsetRef rxGainRef
+                               , radioDeviceSetTxGain             = \g -> bladeRFSetTxGain devRef (round g)
                                , radioDeviceGetRxGain             = readIORef rxGainRef
                                -- ..
                                , radioDeviceGetMaxRxGain          = fromIntegral bladeRFGetMaxRxGain
@@ -140,29 +145,44 @@ constructBladeRFDevice s = do
                                , radioDeviceFullScaleInputValue   = return 2040.0
                                , radioDeviceFullScaleOutputValue  = return 2040.0
                                -- ..
-                               , radioDeviceReadSamples           = bladeRFReadSamples
-                               , radioDeviceWriteSamples          = bladeRFWriteSamples
+                               , radioDeviceReadSamples           = bladeRFReadSamples devRef
+                               , radioDeviceWriteSamples          = bladeRFWriteSamples devRef
                                }
 
   infoM loggerName "Creating bladeRF Device..."
   -- sps = oversampling
   --
-  -- XXX makes this into a record and pass that..
-  bladeRFOpen isSuperSpeed samplesReadRef samplesWrittenRef rxDCOffsetRef rxGainRef 
-  --
   return bladerfdev
 
 
-bladeRFReadSamples  = undefined
-bladeRFWriteSamples = undefined
+bladeRFReadSamples :: IORef DeviceHandle -> Int -> TimeStamp -> IO (BS.ByteString, Int)
+bladeRFReadSamples devRef n _ = do
+  dev <- readIORef devRef
+  ret <- bladeRFSyncRx dev n defaultStreamTimeout
+  case ret of
+    Left e -> throwIO e
+    Right (rxSamples, _) -> do
+      return (rxSamples, 0)
+--      syncRx dev
+
+bladeRFWriteSamples :: IORef DeviceHandle -> BS.ByteString -> Int -> TimeStamp -> Bool -> IO ()
+bladeRFWriteSamples devRef bs _ _ _ = do
+  dev <- readIORef devRef
+  debugM loggerName $ "Tx sample length: " ++ " with timestamp: "
+  putStrLn $ "we got this to write..." ++ show bs
+  ret <- bladeRFSyncTx dev bs Nothing defaultStreamTimeout
+  case ret of
+    Left e -> throwIO e
+    Right _ -> return ()
 
 -- ..............................................
 -- XXXXXXXXXXX wacky types need to use (liftIO . void) everywhere to strip out the Either from the IO () action and then lift it..
 
 
 -- | ..
-bladeRFDeviceStart :: IORef Bool -> IO ()
-bladeRFDeviceStart speedref = withBladeRF $ \dev -> do
+bladeRFDeviceStart :: IORef DeviceHandle -> IORef Bool -> IO ()
+bladeRFDeviceStart devRef speedref = do
+  dev <- readIORef devRef
   --
   rxTimestamp <- newIORef radioDeviceInitialReadTimestamp
   txTimestamp <- newIORef radioDeviceInitialWriteTimestamp
@@ -174,21 +194,33 @@ bladeRFDeviceStart speedref = withBladeRF $ \dev -> do
     noticeM loggerName "starting bladeRF in super speed mode..." else
     noticeM loggerName "starting bladeRF in high speed mode..."
 
+  -- XXXXXXXXX For testing... XXXXXXXXXX
+  --
+  bladeRFLogSetVerbosity LOG_LEVEL_VERBOSE
+  bladeRFSetLoopback dev LB_FIRMWARE
+  --
+  -- XXXXXXXXX For testing... XXXXXXXXXX
+
   bladeRFEnableModule dev MODULE_RX True
   bladeRFEnableModule dev MODULE_TX True
   return () -- XXX
 
 -- | ..
-bladeRFDeviceStop :: IO ()
-bladeRFDeviceStop = withBladeRF $ \dev -> do
+bladeRFDeviceStop :: IORef DeviceHandle -> IO ()
+bladeRFDeviceStop devRef = do
+  dev <- readIORef devRef
   noticeM loggerName "stopping bladeRF"
   bladeRFEnableModule dev MODULE_RX False
   bladeRFEnableModule dev MODULE_TX False
   return () -- XXX
 
 
-bladeRFOpen :: IORef Bool -> IORef Integer -> IORef Integer -> IORef RxDCOffsetParams -> IORef Double ->  IO ()
-bladeRFOpen speedref samplesRRef samplesWRef rxdcoffset rxgainref = withBladeRF $ \dev -> do
+bladeRFOpen :: IORef Bool -> IORef Integer -> IORef Integer -> IORef RxDCOffsetParams -> IORef Double ->  IO (IORef DeviceHandle)
+bladeRFOpen speedref samplesRRef samplesWRef rxdcoffset rxgainref = do
+  --
+  dev <- openBladeRF
+  devRef <- newIORef dev
+  --
   libVersion <- bladeRFLibVersion
   infoM loggerName $ "libbladeRF version: " ++ show libVersion
   serial <- bladeRFGetSerial dev
@@ -265,11 +297,13 @@ bladeRFOpen speedref samplesRRef samplesWRef rxdcoffset rxgainref = withBladeRF 
   --
   -- Set initial gains to minimum, the transceiver will adjust them later
   --
-  _ <- bladeRFSetTxGain' dev bladeRFGetMinTxGain
-  _ <- bladeRFSetRxGain' dev bladeRFGetMinRxGain rxdcoffset rxgainref
+  _ <- bladeRFSetTxGain devRef bladeRFGetMinTxGain
+  _ <- bladeRFSetRxGain devRef bladeRFGetMinRxGain rxdcoffset rxgainref
 
   modifyIORef samplesRRef (const 0)
   modifyIORef samplesWRef (const 0)
+
+  return devRef
 
 
 -- | return maximum Rx Gain
@@ -289,11 +323,9 @@ bladeRFGetMinTxGain = fromEnum TXVGA2_GAIN_MIN
 
 --
 -- | Pass gain in dB's
-bladeRFSetTxGain :: Int -> IO ()
-bladeRFSetTxGain g = withBladeRF $ \dev -> bladeRFSetTxGain' dev g
-
-bladeRFSetTxGain' :: DeviceHandle -> Int -> IO ()
-bladeRFSetTxGain' dev g = do
+bladeRFSetTxGain :: IORef DeviceHandle -> Int -> IO ()
+bladeRFSetTxGain devRef g = do
+  dev <- readIORef devRef
   _ <- bladeRFSetTXVGA1 dev TXVGA1_GAIN_MAX
   --
   if g > bladeRFGetMaxTxGain then
@@ -308,14 +340,11 @@ bladeRFSetTxGain' dev g = do
    do bladeRFSetTXVGA2 dev (toEnum g)
       infoM loggerName $ "TX gain set to " ++ show g ++ " dB."
 
-
 --
 -- | Pass gain in dB's
-bladeRFSetRxGain :: Int -> IORef RxDCOffsetParams -> IORef Double -> IO ()
-bladeRFSetRxGain g rxoffsetref rxgainref = withBladeRF $ \dev -> bladeRFSetRxGain' dev g rxoffsetref rxgainref
-
-bladeRFSetRxGain' :: DeviceHandle -> Int -> IORef RxDCOffsetParams -> IORef Double -> IO ()
-bladeRFSetRxGain' dev g rxoffsetref rxgainref = do
+bladeRFSetRxGain :: IORef DeviceHandle -> Int -> IORef RxDCOffsetParams -> IORef Double -> IO ()
+bladeRFSetRxGain devRef g rxoffsetref rxgainref = do
+  dev <- readIORef devRef
   let newRxMaxOffset = (realToFrac g * gRxOffsetCoef + realToFrac gRxOffsetError) * realToFrac gRxAverageDamping
   modifyIORef rxoffsetref (\x -> x { mRxMaxOffset = newRxMaxOffset })
   rxoffsets <- readIORef rxoffsetref
@@ -326,34 +355,38 @@ bladeRFSetRxGain' dev g rxoffsetref rxgainref = do
 
 --
 -- | Set the VCTCXO offset
-bladeRFSetVCTCXO :: Word16 -> IO ()
-bladeRFSetVCTCXO d = withBladeRF $ \dev -> do
+bladeRFSetVCTCXO :: IORef DeviceHandle -> Word16 -> IO ()
+bladeRFSetVCTCXO devRef d = do
+  dev <- readIORef devRef
   infoM loggerName $ "set VCTCXO: " ++ show d
   bladeRFDACWrite dev $ shiftL d 8
   return () -- XXX
 
 --
 -- | Set the transmitter frequency
-bladeRFSetTxFreq :: Int -> Word16 -> IO ()
-bladeRFSetTxFreq f d = withBladeRF $ \dev -> do
+bladeRFSetTxFreq :: IORef DeviceHandle -> Int -> Word16 -> IO ()
+bladeRFSetTxFreq devRef f d = do
+  dev <- readIORef devRef
   infoM loggerName $ "set Tx freq: " ++ show f ++ " correction: " ++ show d
   bladeRFSetFrequency dev MODULE_TX f
-  bladeRFSetVCTCXO d
+  bladeRFSetVCTCXO devRef d
   return () -- XXX
 
 --
 -- | Set the receiver frequency
-bladeRFSetRxFreq :: Int -> Word16 -> IO ()
-bladeRFSetRxFreq f d = withBladeRF $ \dev -> do
+bladeRFSetRxFreq :: IORef DeviceHandle -> Int -> Word16 -> IO ()
+bladeRFSetRxFreq devRef f d = do
+  dev <- readIORef devRef
   infoM loggerName $ "set Rx freq: " ++ show f ++ " correction: " ++ show d
   bladeRFSetFrequency dev MODULE_RX f
-  bladeRFSetVCTCXO d
+  bladeRFSetVCTCXO devRef d
   return () -- XXX
 
 -- XXX (internal function)
 -- | Set the TX DAC correction offsets
-bladeRFSetTxOffsets :: Int -> Int -> IO ()
-bladeRFSetTxOffsets corrI corrQ = withBladeRF $ \dev -> do
+bladeRFSetTxOffsets :: IORef DeviceHandle -> Int -> Int -> IO ()
+bladeRFSetTxOffsets devRef corrI corrQ = do
+  dev <- readIORef devRef
 --    if ((abs(corrI) > MAX_TX_DC_OFFSET) || (abs(corrQ) > MAX_TX_DC_OFFSET)) return false;
   bladeRFSetCorrection dev MODULE_TX CORR_LMS_DCOFF_I (shiftL shiftTxDC corrI)
   bladeRFSetCorrection dev MODULE_TX CORR_LMS_DCOFF_Q (shiftL shiftTxDC corrQ)
@@ -361,9 +394,12 @@ bladeRFSetTxOffsets corrI corrQ = withBladeRF $ \dev -> do
 
 -- XXX (internal function)
 -- | Set the RX DAC correction offsets
-bladeRFSetRxOffsets :: Int -> Int -> IORef RxDCOffsetParams -> IO ()
-bladeRFSetRxOffsets corrI corrQ rxoffsetref = withBladeRF $ \dev -> do
---    if ((abs(corrI) > MAX_RX_DC_OFFSET) || (abs(corrQ) > MAX_RX_DC_OFFSET)) return false;
+bladeRFSetRxOffsets :: IORef DeviceHandle -> Int -> Int -> IORef RxDCOffsetParams -> IO ()
+bladeRFSetRxOffsets devRef corrI corrQ rxoffsetref = do
+  dev <- readIORef devRef
+  -- YYY we should throw an exception instead of just return'ing here??
+  when ((abs(corrI) > (round maxRxDCOffset)) || (abs(corrQ) > (round maxRxDCOffset))) $ return ()
+  --
   rxoffsets <- readIORef rxoffsetref
   let (rxCorrI, rxCorrQ) = (mRxCorrectionI rxoffsets, mRxCorrectionQ rxoffsets)
   unless ((fromIntegral corrI, fromIntegral corrQ) == (rxCorrI, rxCorrQ)) $ do
