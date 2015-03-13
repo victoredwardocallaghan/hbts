@@ -12,7 +12,8 @@
 module BTS.RadioDevice.NullDevice where
 
 import Data.Time.Clock
-import Data.IORef
+--import Data.IORef
+import Control.Monad.IO.Class
 
 import BTS.RadioDevice
 import BTS.Logger
@@ -20,11 +21,11 @@ import BTS.Logger
 loggerName :: String
 loggerName  = "NullDevice.hs"
 
---data HwState = HwState { sampleRate     :: Double    -- ^ the desired sampling rate
---                       , currentStamp   :: TimeStamp -- ^ internal timestamp clock state
---                       , startTime      :: UTCTime   -- ^ ..
---                       , underRun       :: Bool      -- ^ ..
---                       }
+data NullDevice = NullDevice { sampleRate     :: Double    -- ^ the desired sampling rate
+                             , currentStamp   :: TimeStamp -- ^ internal timestamp clock state
+                             , startTime      :: UTCTime   -- ^ ..
+                             , underRun       :: Bool      -- ^ ..
+                             }
 
 
 --updateTime :: NullDevice ()
@@ -37,71 +38,60 @@ loggerName  = "NullDevice.hs"
 -- | Internal initial state-object constructor
 --runNullDevice sr m = getCurrentTime >>= \curTime -> evalStateT (unNullDevice m) (HwState sr 0 curTime False)
 
+instance RadioDevice NullDevice where
+  radioDeviceStart                 = nullDeviceStart
+  radioDeviceStop                  = nullDeviceStop
+  radioDeviceSetVCTCXO             = undefined
+  radioDeviceSetTxFreq             = nullDeviceSetTxFreq
+  radioDeviceSetRxFreq             = nullDeviceSetRxFreq
+  -- ..
+  radioDeviceSetRxGain             = undefined
+  radioDeviceSetTxGain             = undefined
+  radioDeviceGetRxGain             = return 0.0
+  -- ..
+  radioDeviceGetMaxRxGain          = return 0.0
+  radioDeviceGetMinRxGain          = return 0.0
+  radioDeviceGetMaxTxGain          = return 0.0
+  radioDeviceGetMinTxGain          = return 0.0
+--    -- ..
+  radioDeviceGetTxFreq             = return 0
+  radioDeviceGetRxFreq             = return 0
+  radioDeviceGetSampleRate         = undefined -- readIORef sampleRateRef
+  radioDeviceNumberRead            = undefined -- readIORef samplesReadRef
+  radioDeviceNumberWritten         = undefined -- readIORef samplesWrittenRef
+  -- ..
+  radioDeviceUpdateAlignment       = nullDeviceUpdateAlignment
+  -- ..
+  radioDeviceInitialWriteTimestamp = return 20000 -- Returns the starting write Timestamp
+  radioDeviceInitialReadTimestamp  = return 20000 -- Returns the starting read Timestamp
+  -- ..
+  radioDeviceFullScaleInputValue   = return 13500.0 -- returns the full-scale transmit amplitude
+  radioDeviceFullScaleOutputValue  = return 9450.0  -- returns the full-scale receive amplitude
+  -- ..
+  radioDeviceReadSamples           = undefined -- \_ -> return ()
+  radioDeviceWriteSamples          = undefined -- \_ -> return ()
+
 
 -- | Construct an instance of the RadioDevice interface type with NullDevice
-constructNullDevice :: Double -> IO RadioDevice
-constructNullDevice s = do
---  initLogger loggerName
+--constructNullDevice :: Double -> IO RadioDevice
+--constructNullDevice s = do
+----  initLogger loggerName
+--
+--  --
+--  -- Return internal status values
+--  sampleRateRef     <- newIORef s -- XXX !!! should be a param
+--  samplesReadRef    <- newIORef 0 -- number of samples read from SDR
+--  samplesWrittenRef <- newIORef 0 -- number of samples sent to SDR
+--  startTimeRef      <- getCurrentTime >>= newIORef
 
-  --
-  -- Return internal status values
-  sampleRateRef     <- newIORef s -- XXX !!! should be a param
-  samplesReadRef    <- newIORef 0 -- number of samples read from SDR
-  samplesWrittenRef <- newIORef 0 -- number of samples sent to SDR
-  startTimeRef      <- getCurrentTime >>= newIORef
-  --
-  --
-  let nulldev = RadioDevice { radioDeviceStart                 = nullDeviceStart
-                            , radioDeviceStop                  = nullDeviceStop
-                            , radioDeviceSetVCTCXO             = undefined
-                            , radioDeviceSetTxFreq             = nullDeviceSetTxFreq
-                            , radioDeviceSetRxFreq             = nullDeviceSetRxFreq
-                            -- ..
-                            , radioDeviceSetRxGain             = undefined
-                            , radioDeviceSetTxGain             = undefined
-                            , radioDeviceGetRxGain             = return 0.0
-                            -- ..
-                            , radioDeviceGetMaxRxGain          = 0.0
-                            , radioDeviceGetMinRxGain          = 0.0
-                            , radioDeviceGetMaxTxGain          = 0.0
-                            , radioDeviceGetMinTxGain          = 0.0
-                            -- ..
-                            , radioDeviceGetTxFreq             = 0
-                            , radioDeviceGetRxFreq             = 0
-                            , radioDeviceGetSampleRate         = readIORef sampleRateRef
-                            , radioDeviceNumberRead            = readIORef samplesReadRef
-                            , radioDeviceNumberWritten         = readIORef samplesWrittenRef
-                            -- ..
-                            , radioDeviceUpdateAlignment       = nullDeviceUpdateAlignment
-                            -- ..
-                            , radioDeviceInitialWriteTimestamp = 20000 -- Returns the starting write Timestamp
-                            , radioDeviceInitialReadTimestamp  = 20000 -- Returns the starting read Timestamp
-                            -- ..
-                            , radioDeviceFullScaleInputValue   = return 13500.0 -- returns the full-scale transmit amplitude
-                            , radioDeviceFullScaleOutputValue  = return 9450.0  -- returns the full-scale receive amplitude
-                            -- ..
-                            , radioDeviceReadSamples           = undefined -- \_ -> return ()
-                            , radioDeviceWriteSamples          = undefined -- \_ -> return ()
-                            }
-
-
-  return nulldev
-
-
--- public:
-
--- int loadBurst(short *wDummyBurst, int len);
---  dummyBurst = wDummyBurst;
---  dummyBurstSz = len;
---  return 0;
 
 -- | Start the SDR
-nullDeviceStart :: IO ()
-nullDeviceStart  = infoM loggerName "starting SDR..."
+nullDeviceStart :: RadioState NullDevice ()
+nullDeviceStart  = liftIO $ infoM loggerName "starting SDR..."
 
 -- | Stop the SDR
-nullDeviceStop :: IO ()
-nullDeviceStop  = infoM loggerName "stopping SDR..."
+nullDeviceStop :: RadioState NullDevice ()
+nullDeviceStop  = liftIO $ infoM loggerName "stopping SDR..."
 
 -- | ..
 --nullDeviceWriteSamples :: TimeStamp -> NullDevice ()
@@ -112,13 +102,13 @@ nullDeviceStop  = infoM loggerName "stopping SDR..."
 --  mods s6 (const $ urun || (cts < ts))
 
 -- | Update the alignment between the read and write timestamps
-nullDeviceUpdateAlignment :: TimeStamp -> IO ()
+nullDeviceUpdateAlignment :: TimeStamp -> RadioState NullDevice ()
 nullDeviceUpdateAlignment t = return ()
 
 -- | Set the transmitter frequency
-nullDeviceSetTxFreq :: Double -> Double -> IO ()
+nullDeviceSetTxFreq :: Double -> Double -> RadioState NullDevice ()
 nullDeviceSetTxFreq f a = return ()
 
 -- | Set the receiver frequency
-nullDeviceSetRxFreq :: Double -> Double -> IO ()
+nullDeviceSetRxFreq :: Double -> Double -> RadioState NullDevice ()
 nullDeviceSetRxFreq f a = return ()
