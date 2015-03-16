@@ -1,5 +1,7 @@
 module Main where
 
+import Transceiver
+
 import BTS.RadioDevice
 import BTS.RadioInterface
 import BTS.RadioDevice.NullDevice
@@ -82,4 +84,5 @@ doit ri = do
 
 main :: IO ()
 main = do
-  doit =<< constructRadioInterface
+  parallel_ [controlLoop, dataLoop] >> stopGlobalPool
+--  doit =<< constructRadioInterface
